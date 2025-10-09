@@ -1,4 +1,4 @@
-from vpython import canvas, box, color, vector, sphere, distant_light
+from vpython import canvas, box, color, vector, sphere, distant_light, rate
 import numpy as np
 from types import SimpleNamespace
 
@@ -102,28 +102,10 @@ class TennisCourt:
         )
 
         # Example balls
-        self.ball_yellow = sphere(
+        self.ball = sphere(
             pos=vector(self.court_xz.x, 1.1, self.court_xz.z),
-            size=vector(0.2, 0.2, 0.2),
+            radius=0.1,
             color=color.yellow,
-        )
-
-        self.ball_red = sphere(
-            pos=vector(-self.serve_box.x, 1.1, self.serve_box.z),
-            size=vector(0.2, 0.2, 0.2),
-            color=color.red,
-        )
-
-        self.ball_green = sphere(
-            pos=vector(self.court_xz.x, 1.1, -self.court_xz.z),
-            size=vector(0.2, 0.2, 0.2),
-            color=color.green,
-        )
-
-        self.ball_white = sphere(
-            pos=vector(self.single_court.x, 1.1, self.single_court.z),
-            size=vector(0.2, 0.2, 0.2),
-            color=color.white,
         )
 
     def wait(self):
@@ -134,6 +116,4 @@ class TennisCourt:
 
 
 if __name__ == "__main__":
-    court = TennisCourt()
-    court.create()
-    court.wait()
+    pass
