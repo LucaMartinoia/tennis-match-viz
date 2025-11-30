@@ -101,11 +101,11 @@ class TennisCourt:
             color=color.black,
         )
 
-        # Example balls
         self.ball = sphere(
-            pos=vector(self.court_xz.x, 1.1, self.court_xz.z),
+            pos=vector(self.court_xz.x, 1.4, self.court_xz.z),
             radius=0.1,
             color=color.yellow,
+            make_trail=True,
         )
 
     def wait(self):
@@ -113,7 +113,3 @@ class TennisCourt:
 
     def reset(self):
         pass
-
-
-if __name__ == "__main__":
-    pass

@@ -1,3 +1,3 @@
 engine = "vpython" # options vpython, moderngl
 
-GUI = "pygame" # options pygame, qtpy
+file = "relative/path"
