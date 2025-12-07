@@ -1,39 +1,29 @@
-from court import TennisCourt, coordinates
-from dynamics import Point
-from vpython import vector, rate, mag
+from src.parser import Parser
+from src.dynamics import Point, coordinates
 
-k = 1  # TO DO: slowmotion parameter
+"""
+In main we should:
+0. Setup the global GUI (buttons, canva, search, loops, etc...)
+1. Call parser to read the file and parse the data
+2. Call dynamics to transform the data in a series of points to be used in the animation
+3. Call court to visualize the animation
 
-# The x-acceleraion is to simulate drag:
-# in theory it should be proportional to the velocity,
-# in practice the velocity difference between start and finish is
-# relatively small and a constant acceleration is a good approximation.
-a = vector(-1.5, -9.81, 0)
-f = 60
-dt = 1 / f
-
-court = TennisCourt()
-court.create()
+One BIG advantage of the above stack (file -> parser -> dynamics -> visualization) is that if we later on want to
+change the frontend GUI with something else (Panda3D or Qt) we only have to change court.py.
+"""
 
 
-def initial_velocity(s_i, s_f, t):
-    return (s_f - s_i) / (k * t) - a * t / 2
-
-
-court_xz, single_court, serve_box = coordinates()
-
-t = 0
-# s0 must be defined this way to have a copy
-# with s0 = court.ball.pos, s0 references the same object of ball.pos
-s0 = vector(court.ball.pos.x, court.ball.pos.y, court.ball.pos.z)
-v0 = initial_velocity(
-    court.ball.pos, vector(-single_court.x, 0, -single_court.z), 0.75
-)  # forehand: (30.5, 36)m/s range. backhand: (27.5, 33.5)m/s range. Angle (0,10) maybe
-
-court.wait()
-while court.ball.pos.y > 0:
-    rate(f)
-    t += dt
-    court.ball.pos = s0 + k * (v0 * t + 0.5 * a * t**2)
-
-court.wait()
+if __name__ == "__main__":
+    """
+    1. Reads config file
+    2. Inizialize parser (match list)
+    3. Initialize GUI
+    4. Select match
+    5. Parse match
+    6. Call dynamics on parsed data
+    7. Call GUI on dynamics data
+    8. Global loop
+    """
+    renderer = None
+    if renderer == "vpython":
+        from src.gui_vpython import TennisCourt

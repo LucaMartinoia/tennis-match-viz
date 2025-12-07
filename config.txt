@@ -1,3 +1,5 @@
-engine = "vpython" # options vpython, moderngl
+engine = "vpython" # options vpython, Panda3D, Qt
 
-file = "relative/path"
+file_name = "charting-m-points-2020s.csv"
+
+game_name = "match_id"

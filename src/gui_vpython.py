@@ -2,31 +2,38 @@ from vpython import canvas, box, color, vector, sphere, distant_light, rate
 import numpy as np
 from types import SimpleNamespace
 
+"""
+This module manages the court GUI and animations.
 
-def coordinates():
+The actual computation should go into dynamics.py. This module should be able to
+take the data from dynamics.py and apply a slow-motion algorithm by linearizing subsequent points.
+"""
+
+
+class GUI:
     """
-    Returns the x-z coordinates of various tennis court regions.
+    This class defines the canva and the GUI buttons.
     """
-    court = SimpleNamespace()
-    court.x = 23.77 / 2  # total length
-    court.z = 10.97 / 2  # total width doubles
 
-    single_court = SimpleNamespace()
-    single_court.x = 23.77 / 2
-    single_court.z = 8.23 / 2
+    def __init__(self):
+        """
+        Creates the scene.
+        """
+        self.animation_speed = 1  # TO DO: slowmotion parameter
+        pass
 
-    serve_box = SimpleNamespace()
-    serve_box.x = 6.40  # distance from net to service line
-    serve_box.z = 8.23 / 2  # half-width of singles service box
-    # deep = SimpleNamespace()
-    # wide = SimpleNamespace()
-    # vole = SimpleNamespace()
-    # centre = SimpleNamespace()
-    return court, single_court, serve_box
+    # BUTTONS: tournament/match selector, animation speed, arrows to move between points inside the same match.
 
 
 class TennisCourt:
-    def __init__(self):
+    """
+    All the bits to animate the court and the ball.
+    """
+
+    def __init__(self, scene):
+        """
+        Takes as input the scene from GUI and append the actual tennis objects.
+        """
         # Dimensions in meters (scaled to include surroundings)
         self.image = SimpleNamespace()
         self.image.x = 25.9781
@@ -48,6 +55,11 @@ class TennisCourt:
         }
 
     def create(self, court_type="hard"):
+        """
+        Create the 3D scene and draw the tennis court.
+
+        TO DO: if necessary, pass the scene as parameter and define scene in gui.py
+        """
         self.court_type = court_type
 
         # Create 3D scene
@@ -101,15 +113,20 @@ class TennisCourt:
             color=color.black,
         )
 
-        self.ball = sphere(
-            pos=vector(self.court_xz.x, 1.4, self.court_xz.z),
-            radius=0.1,
-            color=color.yellow,
-            make_trail=True,
-        )
-
     def wait(self):
         input("Press Enter to exit...")
 
     def reset(self):
         pass
+
+    def point(self, point_data, serve=False):
+        """
+        This function should just take as input the point positions and draw them.
+        """
+        if not serve:
+            self.ball = sphere(
+                pos=vector(self.court_xz.x, 1.4, self.court_xz.z),
+                radius=0.1,
+                color=color.yellow,
+                make_trail=True,
+            )
