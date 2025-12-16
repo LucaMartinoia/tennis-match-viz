@@ -1,6 +1,7 @@
 from vpython import canvas, box, color, vector, sphere, distant_light, rate
 import numpy as np
 from types import SimpleNamespace
+from src.engine import coordinates
 
 """
 This module manages the court GUI and animations.
@@ -30,7 +31,7 @@ class TennisCourt:
     All the bits to animate the court and the ball.
     """
 
-    def __init__(self, scene):
+    def __init__(self):
         """
         Takes as input the scene from GUI and append the actual tennis objects.
         """
@@ -39,7 +40,7 @@ class TennisCourt:
         self.image.x = 25.9781
         self.image.z = 16.5201
 
-        self.court_xz, self.single_court, self.serve_box = coordinates()
+        self.court_xz, self.single_court, self.serve_box, net = coordinates()
 
         self.stand_z = 6.15
 
@@ -116,17 +117,24 @@ class TennisCourt:
     def wait(self):
         input("Press Enter to exit...")
 
-    def reset(self):
-        pass
-
     def point(self, point_data, serve=False):
         """
         This function should just take as input the point positions and draw them.
         """
-        if not serve:
-            self.ball = sphere(
-                pos=vector(self.court_xz.x, 1.4, self.court_xz.z),
-                radius=0.1,
-                color=color.yellow,
-                make_trail=True,
-            )
+        pass
+
+    def animate_trajectory(self, traj):
+        """
+        Animate the VPython ball along a NumPy trajectory array (N x 3).
+        """
+        self.ball = sphere(
+            pos=vector(self.court_xz.x, 1, 0.2),
+            radius=0.1,
+            color=color.yellow,
+            make_trail=True,
+        )
+        for p in traj:
+            rate(30)
+            self.ball.pos = vector(float(p[0]), float(p[1]), float(p[2]))
+
+        self.wait()

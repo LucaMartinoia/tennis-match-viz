@@ -1,5 +1,3 @@
 engine = "vpython" # options vpython, Panda3D, Qt
 
 file_name = "charting-m-points-2020s.csv"
-
-game_name = "match_id"

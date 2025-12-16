@@ -1,14 +1,15 @@
 import pandas as pd
 from pathlib import Path
+import re
 
 """
-This module should read the CSV file as pandas dataframe, look for the rows
-associated with the game of interest, and convert the data in a format that
+This module reads the CSV file as pandas dataframe, look for the rows
+associated with the match of interest, and convert the data in a format that
 can be passed to the dynamics and UI.
 
 TO DO:
 - Compute correct Gm missing values
-- Check surface depending on tournament
+- Check court surface depending on tournament
 """
 
 
@@ -19,6 +20,22 @@ class Parser:
 
     def __init__(self, fname: str = "charting-m-points-2020s.csv"):
         """
+        Load, clean and prepare the dataframe.
+        """
+        # Load dataframe
+        print(f"Loading data from {fname}...")
+        self.df, result_str = self._load_csv(fname)
+        # Sanitizing missing entries
+        self._sanitize_df()
+        # Expand the database withn useful fields
+        self._expand_df_fields()
+        print(result_str)
+        # Tournament and match fields
+        self.tournament = ""
+        self.match = ""
+
+    def _load_csv(self, fname: str):
+        """
         Load the database from the CSV file.
         """
         # Directories containing this file and root
@@ -27,7 +44,7 @@ class Parser:
         fpath = root / "data" / fname
         # Loading data
         try:
-            self.df = pd.read_csv(
+            df = pd.read_csv(
                 fpath,
                 dtype={
                     "match_id": "string",
@@ -52,12 +69,9 @@ class Parser:
         except Exception as e:
             raise RuntimeError(f"Error loading CSV file: {e}")
 
-        # Sanitizing missing entries
-        self._fix_missing_values()
-        # Expand the database withn useful fields
-        self.expand_match_id_fields()
+        return df, "Data loaded successfully."
 
-    def _fix_missing_values(self):
+    def _sanitize_df(self):
         """
         Clean dataframe from incorrect entries.
         """
@@ -69,45 +83,101 @@ class Parser:
 
         str: "tournament_name year"
         """
-        return self.df["tournament_full"].unique()
+        return self.df["tournament_full"].astype(str).unique().tolist()
 
-    def matches_list(self, tournament: str):
+    def set_tournament(self, tournament: str):
+        """
+        Set tournament field.
+        """
+        if tournament not in self.df["tournament_full"].values:
+            raise ValueError(f"Tournament '{tournament}' not found in dataset.")
+        self.tournament = tournament
+
+    def set_match(self, match: str):
+        """
+        Set tournament field.
+        """
+        if match not in self.df["match"].values:
+            raise ValueError(f"Tournament '{match}' not found in dataset.")
+        self.match = match
+
+    def matches_list(self, tournament: str = ""):
         """
         Return the full list of matches for a given tournament.
 
-        str: "round - p1_name vs p2_name"
+        str: "match - p1_name vs p2_name"
         """
-        df_t = self.df[self.df["tournament_full"] == tournament]
-        return df_t["round"].unique()
+        if tournament:
+            self.set_tournament(tournament)
+        df_t = self.df[self.df["tournament_full"] == self.tournament]
+        return df_t["match"].astype(str).unique().tolist()
 
-    def match_data(self, tournament: str, match: str):
+    def match_data(self, match: str = ""):
         """
         Return dataframe with list of points in useful form
         """
+        if match:
+            self.set_match(match)
         # Find the match of interest
         df_t = self.df[
-            (self.df["tournament_full"] == tournament) & (self.df["round"] == match)
+            (self.df["tournament_full"] == self.tournament)
+            & (self.df["match"] == self.match)
         ]
         if len(df_t["match_id"].unique()) != 1:
-            print("Tournament and round returned multiple matches.")
+            return print("Tournament and match returned multiple matches.")
 
         # Filter the data we need
         df_t = df_t[
             ["Pt", "Set1", "Set2", "Gm1", "Gm2", "Pts", "Svr", "1st", "2nd", "PtWinner"]
         ]
+        # Parse point strings
+        df_t["1st"] = df_t["1st"].apply(self._format_point)
+        df_t["2nd"] = df_t["2nd"].apply(self._format_point)
+        # Use Pt as index
         df_t = df_t.set_index("Pt")
 
         return df_t
 
-    def format_point(self, point):
-        pass
+    def _format_point(self, point):
+        """
+        Reads the point rallys and convert them in lists
+        of strings that can be used by the dynamics.
+        """
+        serve_error = {"n", "w", "x", "d", "g", "e"}
+        # Handle <NA> entries
+        if pd.isna(point):
+            return [""]
 
-    def expand_match_id_fields(self):
+        # Split using your regex
+        parts = re.findall(r"[A-Za-z][^A-Za-z]*|^[0-9]+", point)
+        cleaned = []
+        for p in parts:
+            if p.startswith("c"):
+                p = p[1:]  # remove leading "c"
+            if p:  # keep only if non-empty
+                cleaned.append(p)
+        parts = cleaned
+
+        # Merge serve errors
+        if (
+            len(parts) == 2
+            and parts[0].isdigit()
+            and len(parts[1]) > 0
+            and parts[1][0] in serve_error
+        ):
+            return [parts[0] + parts[1]]
+
+        for i in range(len(parts) - 1):
+            parts[i] = parts[i] + parts[i + 1][0]
+
+        return parts
+
+    def _expand_df_fields(self):
         """
         Parse match_id for every row and expand the dataframe with:
         - date (YYYY-MM-DD)
         - tournament name
-        - round (round - p1 vs p2)
+        - match (round - p1 vs p2)
         - p1 name
         - p2 name
         - tournament full (tournament+year)
@@ -129,11 +199,14 @@ class Parser:
         self.df["tournament_full"] = (
             parts[2].str.replace("_", " ") + " " + dr.str.slice(0, 4)
         )
-        self.df["round"] = parts[3] + " - " + self.df["p1"] + " vs " + self.df["p2"]
+        self.df["match"] = parts[3] + " - " + self.df["p1"] + " vs " + self.df["p2"]
 
 
-parser = Parser()
+if __name__ == "__main__":
+    parser = Parser()
 
-df = parser.match_data("Australian Open 2021", "R128 - Sinner vs Shapovalov")
+    parser.tournament = "Australian Open 2021"
 
-print(df.head(40))
+    df = parser.match_data("R128 - Sinner vs Shapovalov")
+
+    print(df.head())

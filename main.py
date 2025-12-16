@@ -1,5 +1,7 @@
 from src.parser import Parser
-from src.dynamics import Point, coordinates
+from src.engine import coordinates, Dynamics
+from src.gui_vpython import TennisCourt
+import pandas as pd
 
 """
 In main we should:
@@ -24,6 +26,19 @@ if __name__ == "__main__":
     7. Call GUI on dynamics data
     8. Global loop
     """
+    """
     renderer = None
     if renderer == "vpython":
         from src.gui_vpython import TennisCourt
+    """
+    parser = Parser()
+    parser.matches_list("US Open 2022")
+    match_df = parser.match_data("F - Ruud vs Alcaraz")
+
+    court = TennisCourt()
+    court.create()
+
+    engine = Dynamics(match_df)
+
+    pos = engine.serve("6w")
+    court.animate_trajectory(pos)
