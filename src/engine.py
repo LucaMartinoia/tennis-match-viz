@@ -1,5 +1,4 @@
 import numpy as np
-import random
 from types import SimpleNamespace
 
 """
@@ -14,24 +13,14 @@ def coordinates():
     Returns the x-z coordinates of various tennis court regions
     with respect to the origin at the center.
     """
-    court = SimpleNamespace()
-    court.x = 23.77 / 2  # total length
-    court.z = 10.97 / 2  # total width doubles
-
-    single_court = SimpleNamespace()
-    single_court.x = 23.77 / 2
-    single_court.z = 8.23 / 2
-
-    serve_box = SimpleNamespace()
-    serve_box.x = 6.40  # distance from net to service line
-    serve_box.z = 8.23 / 2  # half-width of singles service box
-    # deep = SimpleNamespace()
-    # wide = SimpleNamespace()
-    # vole = SimpleNamespace()
-    # centre = SimpleNamespace()
-    net = SimpleNamespace()
-    net.center = 0.915
-    net.sides = 1.07
+    # Totale length and width (doubles)
+    court = SimpleNamespace(x=23.77 / 2, z=10.97 / 2)
+    # Totale length and width (single)
+    single_court = SimpleNamespace(x=23.77 / 2, z=8.23 / 2)
+    # Serve box length and width
+    serve_box = SimpleNamespace(x=6.40, z=8.23 / 2)
+    # Net height
+    net = SimpleNamespace(center=0.915, sides=1.07)
     return court, single_court, serve_box, net
 
 
@@ -42,8 +31,10 @@ court, single_court, serve_box, net = coordinates()
 # np.random.seed(42)
 
 # Constants
-G = 9.85  # m/s^2
-A = 1  # m/s^2  # TO DO: scale with velocity and find realistic drag value (eventually per shot type)
+G = 9.81  # m/s^2
+V_FRACTION = 0.7
+FRICTION = 0.85
+ENERGY_BOUNCE = 0.5  # TO DO: scale with court type
 FPS = 120
 SERVE_ERRORS_STR = ["n", "w", "d", "x", "g"]
 SERVE_AREAS = SimpleNamespace(
@@ -69,6 +60,7 @@ class Dynamics:
     def __init__(self, df):
         # Load the match dataframe
         self.match_df = df
+        self.point_in_game = 0  # To compute the quadrant of the server
 
     ############################################
     #       SERVE
@@ -85,19 +77,19 @@ class Dynamics:
                 case "w":
                     xf, zf = self._random_point_in_bbox(SERVE_ERRORS.wide)
                     T = np.random.uniform(0.3, 0.45)
-                    yf = 0.0
+                    yf = 0.1
                 case "d":
                     xf, zf = self._random_point_in_bbox(SERVE_ERRORS.deep)
                     T = np.random.uniform(0.3, 0.45)
-                    yf = 0.0
+                    yf = 0.1
                 case "x":
                     xf, zf = self._random_point_in_bbox(SERVE_ERRORS.widedeep)
                     T = np.random.uniform(0.3, 0.45)
-                    yf = 0.0
+                    yf = 0.1
         # Valid serve
         else:
-            T = np.random.uniform(0.3, 0.45)
-            yf = 0.0
+            T = np.random.uniform(0.3, 0.4)
+            yf = 0.1
             match serve_str[0]:
                 case "4":
                     xf, zf = self._random_point_in_bbox(SERVE_AREAS.wide)
@@ -109,11 +101,21 @@ class Dynamics:
                     xf, zf = self._random_point_in_bbox(SERVE_AREAS.all)
                     print(f"Unkown serve code value {serve_str[0]}.")
 
-        traj1 = self._serve_lob()
-        s0 = traj1[-1]  # shape (3,)
-        sf = np.array([xf, yf, zf], dtype=float)
-        traj2 = self._trajectory(s0, sf, T)
-        traj = np.vstack((traj1, traj2[1:]))
+        throw = self._serve_lob()
+        s0 = throw[-1]  # shape (3,)
+        s1 = np.array([xf, yf, zf], dtype=float)
+        serve, v_f = self._shot_trajectory(s0, s1, T)
+
+        # Bounce
+        if "*" in serve_str:
+            h = 0.1
+            bounce1, v_f = self._bounce(serve[-1], h, v_f)
+            bounce2, _ = self._bounce(bounce1[-1], h, v_f)
+            bounce = np.vstack((bounce1, bounce2))
+        else:
+            h = np.random.uniform(0.4, 1.4)
+            bounce, _ = self._bounce(serve[-1], h, v_f)
+        traj = np.vstack((throw, serve[1:], bounce[1:]))
 
         return traj
 
@@ -128,12 +130,15 @@ class Dynamics:
         # From the end line
         s0 = np.array([single_court.x, h0, 0.2])
         sf = np.array([single_court.x, serve_h, 0.2])
-        traj = self._trajectory(s0, sf, T)
+        traj, _ = self._shot_trajectory(s0, sf, T)
         return traj
 
     ############################################
-    #       GLOBAL
+    #       SHOT
     ############################################
+
+    def point_trajectory(self):
+        pass
 
     def shot_trajectory(self, shot):
         """
@@ -146,7 +151,20 @@ class Dynamics:
         if len(shot) == 4:  # [a][0][0][a] or [a][0][#][a]
             pass
 
-    def _trajectory(self, s0, sf, T):
+    ############################################
+    #       GLOBAL
+    ############################################
+
+    def _parabolic_motion(self, s0, v0, a, T):
+        # Compute the trajectory
+        t = self._time_array(T)
+        traj = s0 + v0[None, :] * t[:, None] + 0.5 * a[None, :] * t[:, None] ** 2
+        # Final velocity
+        v_f = v0 + a * T
+
+        return traj, v_f
+
+    def _shot_trajectory(self, s0, sf, T):
         """
         This is the most basic function, which computes the trajectory
         given the initial and final positions (as numpy arrays) and the time T.
@@ -157,20 +175,62 @@ class Dynamics:
 
         return traj: numpy.array
         """
-        # Compute the 2D angle
-        theta = self._angle_xz(s0, sf)
-        # Compute acceleration vector a
-        if s0[0] == sf[0] and s0[2] == sf[2]:
-            a = -np.array([0, G, 0])
-        else:
-            a = -np.array([A * np.cos(theta), G, A * np.sin(theta)])
+        # Combine into full 3D acceleration
+        a = self._acceleration_vector(s0, sf, T)
         # Compute initial velocity v0
         v0 = (sf - s0 - 0.5 * a * T**2) / T
-        # Compute the trajectory
-        t = self._time_array(T)
-        traj = s0 + v0[None, :] * t[:, None] + 0.5 * a[None, :] * t[:, None] ** 2
 
-        return traj
+        return self._parabolic_motion(s0, v0, a, T)
+
+    def _bounce(self, s0, h, vi):
+        v_after = np.array([FRICTION * vi[0], -ENERGY_BOUNCE * vi[1], FRICTION * vi[2]])
+        # Compute bounce time
+        discriminant = v_after[1] ** 2 - 2 * G * h
+        if discriminant < 0:
+            raise ValueError(
+                "No real solution: the ball cannot reach yf from y0 with given v0."
+            )
+        T = (v_after[1] + np.sqrt(discriminant)) / G
+        a = self._acceleration_bounce(v_after, T)
+
+        return self._parabolic_motion(s0, v_after, a, T)
+
+    def _acceleration_vector(self, s0, sf, T):
+        """
+        Estimates the acceleration vector necessary to produce the
+        desired (fractional) decrease in velocity.
+        """
+        # Horizontal displacement vector (XZ plane)
+        delta_xz = np.array([sf[0] - s0[0], sf[2] - s0[2]])
+        dist_xz = np.linalg.norm(delta_xz)
+        if dist_xz == 0:
+            a_xz = np.array([0, 0])  # purely vertical motion
+        else:
+            unit_xz = delta_xz / dist_xz
+            # Contant horizontal acceleration magnitude
+            a_mag = V_FRACTION * dist_xz / ((1 - V_FRACTION / 2) * T**2)
+            # Horizontal acceleration vector
+            a_xz = -a_mag * unit_xz
+        # Vertical acceleration
+        a_y = -G
+
+        return np.array([a_xz[0], a_y, a_xz[1]])
+
+    def _acceleration_bounce(self, v0, T):
+        # Horizontal velocity vector
+        v_xz = np.array([v0[0], v0[2]])
+        speed_xz = np.linalg.norm(v_xz)
+        # Approximate horizontal displacement
+        dist_xz = speed_xz * T
+        # Compute constant horizontal acceleration magnitude
+        v_fraction = 0.5
+        a_mag = v_fraction * dist_xz / ((1 - v_fraction / 2) * T**2)
+        # Acceleration antiparallel to horizontal velocity
+        a_xz = -a_mag * v_xz / speed_xz
+        # Vertical acceleration
+        a_y = -G
+        # Combine into 3D vector
+        return np.array([a_xz[0], a_y, a_xz[1]])
 
     def _time_array(self, T):
         """
@@ -179,29 +239,7 @@ class Dynamics:
         dt = 1 / FPS
         return np.arange(0, T + dt, dt)
 
-    def _angle_xz(self, vec0, vecf):
-        """
-        Computes the 2D angle on the x-z plane between two vectors.
-        """
-        # Project onto x-z plane
-        u = np.array([vec0[0], vec0[2]])
-        v = np.array([vecf[0], vecf[2]])
-        # Compute angle
-        cross = u[0] * v[1] - u[1] * v[0]
-        dot = np.dot(u, v)
-        # Signed angle
-        theta = np.arctan2(cross, dot)  # radians
-        return theta
-
-    def _velocity_heristic(self, x0, xf, T):
-        """
-        Returns an initial velocity estimate, assuming the decellaration is small.
-
-        Used to scale the drag with velocity.
-        """
-        return np.linalg.norm(xf - x0) / T
-
-    def _quadrant_selection(self):
+    def _quadrant_selection(self, point, server):
         """
         This function takes the score and the server (p1 or p2)
         and computes the final trajectory.

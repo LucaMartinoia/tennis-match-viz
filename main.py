@@ -40,5 +40,5 @@ if __name__ == "__main__":
 
     engine = Dynamics(match_df)
 
-    pos = engine.serve("6w")
+    pos = engine.serve("5*")
     court.animate_trajectory(pos)
