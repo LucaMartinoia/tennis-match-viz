@@ -13,7 +13,7 @@ TO DO:
 """
 
 
-class Parser:
+class Database:
     """
     Load the database and extract match data.
     """
@@ -143,7 +143,7 @@ class Parser:
         Reads the point rallys and convert them in lists
         of strings that can be used by the dynamics.
         """
-        serve_error = {"n", "w", "x", "d", "g", "e"}
+        error = {"n", "w", "x", "d", "g", "e"}
         # Handle <NA> entries
         if pd.isna(point):
             return [""]
@@ -152,23 +152,22 @@ class Parser:
         parts = re.findall(r"[A-Za-z][^A-Za-z]*|^[0-9]+", point)
         cleaned = []
         for p in parts:
+            # drop approach marker
+            p = p.replace("+", "")
             if p.startswith("c"):
                 p = p[1:]  # remove leading "c"
             if p:  # keep only if non-empty
                 cleaned.append(p)
         parts = cleaned
 
-        # Merge serve errors
-        if (
-            len(parts) == 2
-            and parts[0].isdigit()
-            and len(parts[1]) > 0
-            and parts[1][0] in serve_error
-        ):
-            return [parts[0] + parts[1]]
-
+        # Annotate transitions
         for i in range(len(parts) - 1):
             parts[i] = parts[i] + parts[i + 1][0]
+
+        # merge trailing error, for any length >= 2
+        if len(parts) >= 2 and parts[-1][0] in error:
+            parts[-2] += parts[-1][1:]
+            parts.pop()
 
         return parts
 

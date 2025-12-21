@@ -1,7 +1,6 @@
-from src.parser import Parser
-from src.engine import coordinates, Dynamics
+from src.database import Database
+from src.match import Match
 from src.gui_vpython import TennisCourt
-import pandas as pd
 
 """
 In main we should:
@@ -31,14 +30,19 @@ if __name__ == "__main__":
     if renderer == "vpython":
         from src.gui_vpython import TennisCourt
     """
-    parser = Parser()
-    parser.matches_list("US Open 2022")
-    match_df = parser.match_data("F - Ruud vs Alcaraz")
+    database = Database()
+    database.matches_list("US Open 2022")
+    match_df = database.match_data("F - Ruud vs Alcaraz")
+
+    # print(match_df.head(20))
 
     court = TennisCourt()
     court.create()
 
-    engine = Dynamics(match_df)
+    match = Match(match_df)
 
-    pos = engine.serve("5*")
-    court.animate_trajectory(pos)
+    match.select_point(4)
+
+    match.shot("b28f")
+    match.serve("4w")
+    court.animate_trajectory(match.trajectory())

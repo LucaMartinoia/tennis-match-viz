@@ -1,5 +1,4 @@
 from vpython import canvas, box, color, vector, sphere, distant_light, rate
-import numpy as np
 from types import SimpleNamespace
 from src.engine import coordinates
 
@@ -46,7 +45,6 @@ class TennisCourt:
 
         self.scene = None
         self.court_type = None
-        self.test = np.array([0, 0, 0])
 
         # Available court textures
         self.court_textures = {
@@ -132,6 +130,7 @@ class TennisCourt:
             radius=0.1,
             color=color.yellow,
             make_trail=True,
+            retain=500,
         )
         for p in traj:
             rate(30)
