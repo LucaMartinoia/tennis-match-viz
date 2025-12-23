@@ -69,6 +69,7 @@ class TennisCourt:
             center=vector(0, 0, 0),
             background=color.black,
         )
+        self.scene.autoscale = False
 
         # Lighting
         distant_light(direction=vector(0, 1, 0), color=color.white * 0.1)
@@ -125,8 +126,9 @@ class TennisCourt:
         """
         Animate the VPython ball along a NumPy trajectory array (N x 3).
         """
+        s0 = traj[0]
         self.ball = sphere(
-            pos=vector(self.court_xz.x, 1, 0.2),
+            pos=vector(float(s0[0]), float(s0[1]), float(s0[2])),
             radius=0.1,
             color=color.yellow,
             make_trail=True,

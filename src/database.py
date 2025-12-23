@@ -150,21 +150,25 @@ class Database:
 
         # Split using your regex
         parts = re.findall(r"[A-Za-z][^A-Za-z]*|^[0-9]+", point)
+
+        # Annotate transitions with optional "-" or "="
+        for i in range(len(parts) - 1):
+            m = re.match(r"^([A-Za-z][-=;^?]?)", parts[i + 1])
+            if m:
+                parts[i] += m.group(1)
+
         cleaned = []
         for p in parts:
             # drop approach marker
             p = p.replace("+", "")
+            p = re.sub(r"([-=;^])(?=.)", "", p)
             if p.startswith("c"):
                 p = p[1:]  # remove leading "c"
             if p:  # keep only if non-empty
                 cleaned.append(p)
         parts = cleaned
 
-        # Annotate transitions
-        for i in range(len(parts) - 1):
-            parts[i] = parts[i] + parts[i + 1][0]
-
-        # merge trailing error, for any length >= 2
+        # Merge trailing error, for any length >= 2
         if len(parts) >= 2 and parts[-1][0] in error:
             parts[-2] += parts[-1][1:]
             parts.pop()
