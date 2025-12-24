@@ -20,8 +20,8 @@ class PointData:
     second: str
     point: int
     server: int
-    hand1: bool = True
-    hand2: bool = True
+    righthand1: bool = True
+    righthand2: bool = True
 
 
 class Match:
@@ -34,11 +34,10 @@ class Match:
         Loads the match data and keep track of points.
         """
         # Load the match dataframe
-        print("Loading match...")
         self.match_df = df
         self.point_in_game = 0  # To compute the quadrant of the server
-        self.point = 1  # Point under consideration
-        self.engine = Engine()  # One point per timestep
+        self.point = 1  # Current point in match
+        self.engine = Engine()
         self.parser = Parser(self.engine)
 
     def point_trajectory(self) -> None:
@@ -49,13 +48,13 @@ class Match:
             first=self.match_df.loc[self.point, "1st"],
             second=self.match_df.loc[self.point, "2nd"],
             point=self.point_in_game,
-            server=self.match_df.loc[self.point, "server"],
-            hand1=True,
-            hand2=True,
+            server=self.match_df.loc[self.point, "Svr"],
+            righthand1=True,
+            righthand2=True,
         )
         result = self.parser.run_point(point_data)
-        if not result:
-            self.next_point()
+        # if not result:
+        #    self.next_point()
 
     def select_point(self, point: int) -> None:
         """
@@ -70,9 +69,13 @@ class Match:
         gm2 = self.match_df.loc[self.point, "Gm2"]
 
         # Find first point in the current game looping backward
-        i = self.point
+        i = self.point - 1
         count = 0
-        while self.match_df.loc[i, "Gm1"] == gm1 and self.match_df.loc[i, "Gm2"] == gm2:
+        while (
+            i >= 1
+            and self.match_df.loc[i, "Gm1"] == gm1
+            and self.match_df.loc[i, "Gm2"] == gm2
+        ):
             count += 1
             i -= 1
 

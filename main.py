@@ -29,21 +29,18 @@ def main() -> None:
 
 if __name__ == "__main__":
 
-    # database = Database()
-    # database.matches_list("US Open 2022")
-    # match_df = database.match_data("F - Ruud vs Alcaraz")
-
-    # print(match_df.head(20))
+    database = Database()
+    database.matches_list("US Open 2022")
+    match_df = database.match_data("F - Ruud vs Alcaraz")
 
     court = TennisCourt()
     court.create()
 
-    match = Match()
+    match = Match(match_df)
 
-    # match.select_point(4)
+    print(match_df.head(20))
 
-    match.parser._serve("4f", right=False)
-    match.parser._shot("f19f", 1)
-    match.parser._shot("f1w#", 2)
-    match.parser._side_selection(1)
+    match.select_point(19)
+    match.point_trajectory()
+
     court.animate_trajectory(match.trajectory)

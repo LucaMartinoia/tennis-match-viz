@@ -92,40 +92,49 @@ class Parser:
 
     def run_point(self, point_data) -> bool:
         """
-        Extract the point data and call the rallys.
+        Entry point to compute the trajectory.
+        Extract the point data and call the rallies.
         """
         # Extract point data
-        righthanded1 = point_data.hand1
-        righthanded2 = point_data.hand2
+        righthanded = (point_data.righthand1, point_data.righthand2)
+        point_in_game = point_data.point
+        server = point_data.server
         # First serve attempt
-        if point_data.first:
-            result = self._run_rally(point_data.first)
+        if point_data.first[0]:
+            result = self._run_rally(
+                point_data.first, point_in_game, righthanded, server
+            )
 
             # Check if first serve was a fault
-            if point_data.second:
+            if point_data.second[0]:
                 self.engine.pause(1.0)
-                result = self._run_rally(point_data.second)
+                result = self._run_rally(
+                    point_data.second, point_in_game, righthanded, server
+                )
             else:
                 # If both serves are missing
                 return False
 
         # Mirror depending on server side
-        self._side_selection(point_data.server)
+        self._side_selection(server)
         # Return result
         return result
 
-    def _run_rally(self, rally):
+    def _run_rally(self, rally, point_in_game: int, righthanded, server: int) -> bool:
         """
         Parse the rally list to compute the trajectory.
+
+        IMPORTANT: righthanded and server might not be necessary after all.
         """
         # Check for non-mapped or penalty points
         if rally in ("S", "R", "P", "Q"):
             return False
 
-        # Call serve first, then the shots
+        # Call serve first
         if rally[0][0].isdigit():
-            self._serve(rally[0])
-
+            right = True if point_in_game % 2 == 0 else False
+            self._serve(rally[0], right)
+            # Then call the shots
             for i, shot in enumerate(rally[1:]):
                 self._shot(shot, i + 1)
             # Return positive result
@@ -333,11 +342,12 @@ class Parser:
         This function takes the server side (1 or 2)
         and computes the final trajectory.
 
-        If p2 is serving, the trajectory is symmetrized along the x axis.
+        If p2 is serving, the trajectory is symmetrized along the x and z axis.
         """
         lambdax = 1 if server == 1 else -1
+        lambdaz = 1 if server == 1 else -1
 
-        self.engine.apply_symmetry(lambdax=lambdax)
+        self.engine.apply_symmetry(lambdax=lambdax, lambdaz=lambdaz)
 
     def _random_point_in_bbox(self, bbox):
         """

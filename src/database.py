@@ -154,7 +154,7 @@ class Database:
 
         # Annotate transitions with optional "-" or "="
         for i in range(len(parts) - 1):
-            m = re.match(r"^([A-Za-z][-=;^?]?)", parts[i + 1])
+            m = re.match(r"^([A-Za-z][-=?]?)", parts[i + 1])
             if m:
                 parts[i] += m.group(1)
 
@@ -162,7 +162,7 @@ class Database:
         for p in parts:
             # drop approach marker
             p = p.replace("+", "")
-            p = re.sub(r"([-=;^])(?=.)", "", p)
+            p = re.sub(r"([-=^])(?=.)", "", p)
             if p.startswith("c"):
                 p = p[1:]  # remove leading "c"
             if p:  # keep only if non-empty
