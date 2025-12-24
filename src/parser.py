@@ -4,8 +4,15 @@ from dataclasses import dataclass
 import re
 
 """
-This module manages the core logic: it takes the match database and,
-for each point, computes the full trajectory of the ball.
+This module bridges Match and Engine: it takes the point data
+and converts it to geometric quantities that can be passed to Engine.
+
+TO DO:
+- Order functions
+- Test functions
+- Refactor certain functions
+- Adjust time/position parameters
+- Implement higher diversity in shots (spin, fore/back-hand)
 """
 
 np.random.seed(1)
@@ -14,6 +21,7 @@ np.random.seed(1)
 # Constants
 #######################
 court, single_court, serve_box, net = coordinates()
+YGROUND = 0.15
 ERRORS_STR = ["n", "w", "d", "x", "g", "e"]  # Error code
 # Court bbox
 MODE_BBOX = {
@@ -35,25 +43,26 @@ SERVE_BBOX = {
 # Single region bbox
 SINGLE_BBOX = {
     # Deep shots
-    "1d": [-single_court.z, -0.4 * single_court.z],  # Left 30%
+    "1d": [0.4 * single_court.z, single_court.z],  # Left 30%
     "2d": [-0.4 * single_court.z, 0.4 * single_court.z],  # Middle 40%
-    "3d": [0.4 * single_court.z, single_court.z],  # Right 40%
+    "3d": [-single_court.z, -0.4 * single_court.z],  # Right 30%
     "0dz": [-single_court.z, single_court.z],  # Unknown width
     # Short shots
-    "1s": [
-        -single_court.z + 1.5,
-        -0.4 * single_court.z,
-    ],  # Left 30%
-    "2s": [-0.4 * single_court.z, 0.4 * single_court.z],  # Middle 40%
-    "3s": [
+    "1s": [  # Left 30%
         0.4 * single_court.z,
         single_court.z - 1.5,
-    ],  # Right 30%
+    ],
+    "2s": [-0.4 * single_court.z, 0.4 * single_court.z],  # Middle 40%
+    "3s": [  # Right 30%
+        -single_court.z + 1.5,
+        -0.4 * single_court.z,
+    ],
     "0sz": [
         -single_court.z + 1.5,
         single_court.z - 1.5,
     ],  # Unknown width
     # Depth
+    "6": [-serve_box.x - 2, -0.5],  # Drop shots
     "7": [-serve_box.x, -2],  # Inside serve box
     "8": [-(serve_box.x + single_court.x) / 2, -serve_box.x],  # Close to serve box
     "9": [-single_court.x, -(serve_box.x + single_court.x) / 2],  # Close to baseline
@@ -72,17 +81,59 @@ class ShotIntent:
 
 class Parser:
     """
-    The match class parses shot data into geometric quantities.
+    The Parser class parses shot data into geometric quantities.
     """
 
     def __init__(self, engine):
         """
-        Loads the match data and keep track of points.
+        Loads the physic engine.
         """
-        # Load the match dataframe
         self.engine = engine
 
-    def _serve(self, serve_str: str) -> None:
+    def run_point(self, point_data) -> bool:
+        """
+        Extract the point data and call the rallys.
+        """
+        # Extract point data
+        righthanded1 = point_data.hand1
+        righthanded2 = point_data.hand2
+        # First serve attempt
+        if point_data.first:
+            result = self._run_rally(point_data.first)
+
+            # Check if first serve was a fault
+            if point_data.second:
+                self.engine.pause(1.0)
+                result = self._run_rally(point_data.second)
+            else:
+                # If both serves are missing
+                return False
+
+        # Mirror depending on server side
+        self._side_selection(point_data.server)
+        # Return result
+        return result
+
+    def _run_rally(self, rally):
+        """
+        Parse the rally list to compute the trajectory.
+        """
+        # Check for non-mapped or penalty points
+        if rally in ("S", "R", "P", "Q"):
+            return False
+
+        # Call serve first, then the shots
+        if rally[0][0].isdigit():
+            self._serve(rally[0])
+
+            for i, shot in enumerate(rally[1:]):
+                self._shot(shot, i + 1)
+            # Return positive result
+            return True
+        else:
+            return False  # Does not start with a serve
+
+    def _serve(self, serve_str: str, right: bool = True) -> None:
         """
         Parse the serve string and compute the trajectory.
         """
@@ -93,7 +144,7 @@ class Parser:
         xf, zf = self._random_point_in_bbox(serve_area)
         shot_data = ShotIntent(
             x=xf,
-            y=0.05,
+            y=YGROUND,
             z=zf,
             T=np.random.uniform(0.3, 0.4),
         )
@@ -102,8 +153,13 @@ class Parser:
         if serve_str[-1] in ERRORS_STR:
             self._apply_error(shot_data, serve_str[-1], MODE_BBOX["serve"])
 
+        # Adjust z coordinate depending on side of serve
+        shot_data.z = -shot_data.z if right else shot_data.z
+
         # Serve shot
-        v_f = self.engine.serve(shot_data.x, shot_data.y, shot_data.z, shot_data.T)
+        v_f = self.engine.serve(
+            shot_data.x, shot_data.y, shot_data.z, shot_data.T, right
+        )
 
         # If net, fall down to ground
         if shot_data.net:
@@ -119,61 +175,21 @@ class Parser:
 
         self.engine.bounces(v_f, n)
 
-    def run_point(self, point_data):
+    def _shot(self, shot_str: str, shot_index: int, righthanded: bool = True) -> bool:
         """
-        Extract the point data and call the serve and shot functions.
-        """
-        # Extract point data
-        righthanded1 = point_data.hand1
-        righthanded2 = point_data.hand2
-
-        # First serve attempt
-        if point_data.first:
-            self._run_rally(point_data.first)
-
-            # Check if first serve was a fault
-            if point_data.second:
-                self.engine.pause(1.0)
-                self._run_rally(point_data.second)
-            else:
-                return "Failed to compute trajectory."
-
-        self._quadrant_selection(point_data.server, point_data.point)
-
-        return "Trajectory computed successfully."
-
-    def _run_rally(self, rally):
-        """
-        Compute the rally trajectory.
-        """
-        # Check for non-mapped or penalty points
-        if rally in ("S", "R", "P", "Q"):
-            return
-
-        # Call serve first, then the shots
-        if rally[0][0].isdigit():
-            self._serve(rally[0])
-
-            for i, shot in enumerate(rally[1:]):
-                self._shot(shot, i + 1)
-        else:
-            return  # Does not start with a serve
-
-    def _shot(self, shot_str: str, i: int, righthanded: bool = True) -> None:
-        """
-        This function takes the single shots and create the trajectory.
+        Parse the shot string and compute the trajectory.
         """
         # Finds side of court
-        side = "server" if i % 2 == 0 else "defender"
+        server = True if shot_index % 2 == 0 else False
 
-        # Parse shot code
-        m = re.match(r"^([A-Za-z])([;^]?)(\d{0,2})(.+)$", shot_str)  # Regex match
+        # Parse shot code: letter+(symbol)+(0-2 digits)+rest
+        m = re.match(r"^([A-Za-z])([;^]?)(\d{0,2})(.*)$", shot_str)  # Regex match
         if not m:
-            raise ValueError(f"Invalid shot string: {shot_str}")
+            # If error, return False
+            return False
 
         # Find shot type, landing position and response shot
         shot_type, extra, position, response = m.groups()
-        l = len(shot_str)
 
         # Default shot data
         shot_data = self._compute_landing_data(shot_type, extra, position, response)
@@ -184,57 +200,58 @@ class Parser:
             error = response_char if response_char in ERRORS_STR else "e"
             self._apply_error(shot_data, error, MODE_BBOX["single"])
 
-        # Bounces
+        # Count bounces
         if shot_data.net:
             n = 3
         elif any(c in shot_str for c in "*#@C") or response_char in ERRORS_STR:
             n = 2
-            if "*" in shot_str:  # If winner, shot is faster
-                shot_data.T -= 0.2
         else:
             n = 1
 
+        # Adjust x and z coordinates depending on side of court
+        shot_data.z = shot_data.z if server else -shot_data.z
+        shot_data.x = shot_data.x if server else -shot_data.x
+
         # Shot trajectory
-        if ";" not in extra:
-            v_f = self.engine.shot(
-                shot_data.x, shot_data.y, shot_data.z, shot_data.T, side=side
+        if ";" in extra:
+            # Shot hit net cords
+            v_f = self.engine.net_cord(
+                shot_data.x, shot_data.y, shot_data.z, shot_data.T
             )
         else:
-            # Net cord
-            v_f = self.engine.net_cord(
-                shot_data.x, shot_data.y, shot_data.z, shot_data.T, side=side
-            )
+            # Normal shot
+            v_f = self.engine.shot(shot_data.x, shot_data.y, shot_data.z, shot_data.T)
 
         # If net, fall down to ground
         if shot_data.net:
             v_f = self.engine.net_drop()
-        # Append bounces
-        self.engine.bounces(v_f, n)
 
-        print(
-            f"-- Shot number {i}: {shot_str} --\n"
-            + f"pattern: {shot_type}, {extra}, {position}, {response}; length {l}"
-        )
+        # Append bounces if land on ground or net
+        if shot_data.y == YGROUND or shot_data.net:
+            self.engine.bounces(v_f, n)
 
-        # Apply symmetries
-        if righthanded:
-            self.engine.apply_symmetry(lambdaz=-1)
+        # Apply symmetries to lefties
+        # THIS MUST BE APPLIED TO SHOT DATA, NOT TO FINAL TRAJECTORY
+        # if righthanded:
+        #    self.engine.apply_symmetry(lambdaz=-1)
+
+        return True
 
     def _compute_landing_data(
         self, shot_type: str, extra: str, position: str, response: str
     ) -> ShotIntent:
         """
-        Helpher method to compute the default landing data given
-        the shot, the position and the response shot.
+        Method to compute the landing data given
+        the shot type, the position and the response shot.
         """
         # Read width and depth data
         width = position[0] if len(position) > 0 else ""
         depth = position[1] if len(position) > 1 else ""
         width += "d"
-        # Compute x and z bounds
+        # Compute default x and z bounds
         x_bounds = SINGLE_BBOX.get(depth, SINGLE_BBOX["0x"])
         z_bounds = SINGLE_BBOX.get(width, SINGLE_BBOX["0dz"])
-        yf = 0.05
+        yf = YGROUND
 
         # Determine time T based on shot type
         match shot_type:
@@ -242,54 +259,63 @@ class Parser:
             case "f" | "b" | "r" | "s" | "t" | "q":
                 T = np.random.uniform(1.05, 1.45)  # Baseline shots
             case "v" | "z" | "h" | "i" | "j" | "k":
-                T = np.random.uniform(0.2, 0.35)  # Voleè
+                T = np.random.uniform(0.5, 0.65)  # Voleè
             case "o" | "p":
                 T = np.random.uniform(0.2, 0.35)  # Smash
             case "u" | "y":
-                T = np.random.uniform(0.6, 0.85)  # Drop shot
+                T = np.random.uniform(0.6, 0.85)  # Drop shot TO DO: ADJUST DEPTH
             case "l" | "m":
                 T = np.random.uniform(1, 1.5)  # Lob
             case _:
-                T = np.random.uniform(0.3, 0.45)  # Unknown
+                T = np.random.uniform(1.05, 1.45)  # Unknown
 
         # Adjust landing depending on response shot
+        # If response position is indicated
         if len(response) > 1 and response[1] in ("-", "="):
-            # If response position is indicated
             match response[1]:
+                # Response near net
                 case "-":
                     T -= 0.1  # Reduce time
                     # If depth missing
                     depth = depth if depth else "7"  # Inside serve box
-                    width += "s"
-                    z_bounds = SINGLE_BBOX.get(width, SINGLE_BBOX["0dz"])  # Short width
                     x_bounds = SINGLE_BBOX.get(depth)
+                # Response near baseline
                 case "=":
                     T += 0.1  # Increment time
                     # If depth missing
-                    depth = depth if depth else "9"  # Inside serve box
-                    width += "d"
-                    z_bounds = SINGLE_BBOX.get(width, SINGLE_BBOX["0dz"])  # Short width
+                    depth = depth if depth else "9"  # Near baseline
                     x_bounds = SINGLE_BBOX.get(depth)
+        # If response position is not indicated
         else:
+            # Check response type
             match response[0]:
                 case "v" | "z" | "h" | "i" | "j" | "k":  # Voleè
                     T -= 0.1  # Reduce time
-                    yf = (
-                        0.05 if "^" in extra else np.random.uniform(0.8, 1.8)
-                    )  # Bounce check
+                    yf = np.random.uniform(0.8, 1.8)  # Hit mid air
                     # If depth missing
                     depth = depth if depth else "7"  # Inside serve box
-                    width += "s"
+                    width = width[0] + "s"
                     z_bounds = SINGLE_BBOX.get(width, SINGLE_BBOX["0sz"])  # Short width
                     x_bounds = SINGLE_BBOX.get(depth)
 
                 case "o" | "p":  # Smash
-                    yf = np.random.uniform(2.0, 2.5)  # Before bounce
+                    yf = np.random.uniform(2.5, 3.2)  # Hit mid air
                     # If depth missing
                     depth = depth if depth else "8"  # From mid court
-                    width += "s"
+                    width = width[0] + "s"
                     z_bounds = SINGLE_BBOX.get(width, SINGLE_BBOX["0sz"])  # Short width
                     x_bounds = SINGLE_BBOX.get(depth)
+
+                case "*":  # Winners
+                    T -= 0.1  # Faster shot
+                    yf = YGROUND
+                    x_bounds = SINGLE_BBOX.get("9")
+
+        # Check for volè drop shot
+        if extra == "^":
+            x_bounds = SINGLE_BBOX.get("6")
+            yf = YGROUND
+            T += 0.2
 
         xf, zf = self._random_point_in_bbox(
             [x_bounds[0], z_bounds[0], x_bounds[1], z_bounds[1]]
@@ -302,26 +328,16 @@ class Parser:
             T=T,
         )
 
-    def _quadrant_selection(self, server: int = 1, point_in_game: int = 0):
+    def _side_selection(self, server: int = 1):
         """
-        This function takes the score and the server (p1 or p2)
+        This function takes the server side (1 or 2)
         and computes the final trajectory.
 
-        This is done via symmetry: if p2 is serving, the trajectory is symmetrized
-        along the x axis. If the score is "odd", then the trajectory is symmetrized
-        along the z axis.
+        If p2 is serving, the trajectory is symmetrized along the x axis.
         """
-        lambdax = 1
-        lambdaz = -1
+        lambdax = 1 if server == 1 else -1
 
-        if server == 2:
-            lambdax = -1
-            lambdaz = 1
-
-        if point_in_game % 2 == 1:
-            lambdaz = -lambdaz
-
-        self.engine.apply_symmetry(lambdax=lambdax, lambdaz=lambdaz)
+        self.engine.apply_symmetry(lambdax=lambdax)
 
     def _random_point_in_bbox(self, bbox):
         """
@@ -346,8 +362,8 @@ class Parser:
             case "n" | "g":  # Net or foot fault
                 # Recompute all values
                 intent.x = 0.2
-                intent.T = np.random.uniform(0.2, 0.35)
-                intent.y = np.random.uniform(0.3, 0.91)
+                intent.T = np.random.uniform(0.3, 0.45)
+                intent.y = np.random.uniform(0.5, 0.91)
                 intent.net = True
 
             case "w":  # Wide shot

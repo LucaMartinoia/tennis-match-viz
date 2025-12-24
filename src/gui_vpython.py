@@ -7,6 +7,16 @@ This module manages the court GUI and animations.
 
 The actual computation should go into dynamics.py. This module should be able to
 take the data from dynamics.py and apply a slow-motion algorithm by linearizing subsequent points.
+
+TO DO:
+- GUI with buttons: next point, previous point, select tournament, select match, slowmotion
+- Actual animation loop
+- Slowmotion
+- Wrapper functions to the GUI elements
+- Improve lighting (day/night) and camera (fix above surface)
+- Improve court render (correct size, court types)
+- Improve net render (curved net)
+- Improve ball render (spin, trail, and mash)
 """
 
 
@@ -77,7 +87,7 @@ class TennisCourt:
         # Court
         self.court = box(
             pos=vector(0, 0, 0),
-            size=vector(self.image.x, 0.1, self.image.z),
+            size=vector(self.image.x, 0.25, self.image.z),
             texture=self.court_textures[self.court_type],
         )
 
@@ -127,15 +137,16 @@ class TennisCourt:
         Animate the VPython ball along a NumPy trajectory array (N x 3).
         """
         s0 = traj[0]
+
         self.ball = sphere(
             pos=vector(float(s0[0]), float(s0[1]), float(s0[2])),
             radius=0.1,
             color=color.yellow,
             make_trail=True,
-            retain=500,
+            retain=1000,
         )
         for p in traj:
-            rate(30)
+            rate(60)
             self.ball.pos = vector(float(p[0]), float(p[1]), float(p[2]))
 
         self.wait()

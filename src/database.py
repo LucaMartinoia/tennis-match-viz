@@ -33,6 +33,7 @@ class Database:
         # Tournament and match fields
         self.tournament = ""
         self.match = ""
+        self.court = ""
 
     def _load_csv(self, fname: str):
         """
@@ -204,12 +205,8 @@ class Database:
         )
         self.df["match"] = parts[3] + " - " + self.df["p1"] + " vs " + self.df["p2"]
 
-
-if __name__ == "__main__":
-    parser = Parser()
-
-    parser.tournament = "Australian Open 2021"
-
-    df = parser.match_data("R128 - Sinner vs Shapovalov")
-
-    print(df.head())
+    def court_type(self):
+        """
+        This method should scrape Wikipedia to find the court type for the given tournament.
+        """
+        pass

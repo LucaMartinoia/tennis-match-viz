@@ -3,18 +3,17 @@ from src.match import Match
 from src.gui_vpython import TennisCourt
 
 """
-In main we should:
-0. Setup the global GUI (buttons, canva, search, loops, etc...)
-1. Call parser to read the file and parse the data
-2. Call dynamics to transform the data in a series of points to be used in the animation
-3. Call court to visualize the animation
-
-One BIG advantage of the above stack (file -> parser -> dynamics -> visualization) is that if we later on want to
-change the frontend GUI with something else (Panda3D or Qt) we only have to change gui.py.
+TO DO:
+- Understand how to manage the main loop
+- Write def main()
+- Check everything
+- Document every functions
+- Write README
+- Create installer with .exe file
 """
 
 
-if __name__ == "__main__":
+def main() -> None:
     """
     1. Reads config file
     2. Inizialize parser (match list)
@@ -25,11 +24,11 @@ if __name__ == "__main__":
     7. Call GUI on dynamics data
     8. Global loop
     """
-    """
-    renderer = None
-    if renderer == "vpython":
-        from src.gui_vpython import TennisCourt
-    """
+    pass
+
+
+if __name__ == "__main__":
+
     # database = Database()
     # database.matches_list("US Open 2022")
     # match_df = database.match_data("F - Ruud vs Alcaraz")
@@ -43,15 +42,8 @@ if __name__ == "__main__":
 
     # match.select_point(4)
 
-    """
-    TESTS for SHOT
-    "b28f", "f2b-", "f28n@", "f1w#", "b1w", "b#", "b1#", "f;1", "v^2"
-
-    TESTS for _format_point:
-    "f12b-3@", "f+27b=6d8#", "f;1", "v^2"
-    """
-    match.parser._serve("4b")
-    match.parser._shot("b;1f", 1)
-    match.parser._shot("f3*", 2)
-    match.parser._quadrant_selection(1)
+    match.parser._serve("4f", right=False)
+    match.parser._shot("f19f", 1)
+    match.parser._shot("f1w#", 2)
+    match.parser._side_selection(1)
     court.animate_trajectory(match.trajectory)

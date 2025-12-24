@@ -6,6 +6,11 @@ from dataclasses import dataclass
 """
 This module manages the core logic: it takes the match database and,
 for each point, computes the full trajectory of the ball.
+
+TO DO:
+- Enrich method
+- Order functions
+- Test functions
 """
 
 
@@ -35,27 +40,22 @@ class Match:
         self.point = 1  # Point under consideration
         self.engine = Engine()  # One point per timestep
         self.parser = Parser(self.engine)
-        self.point_data = PointData(
-            first="",
-            second="",
-            point=self.point_in_game,
-            server=0,
-            hand1=True,
-            hand2=True,
-        )
 
-    def point_trajectory(self):
+    def point_trajectory(self) -> None:
         """
         Entry point to compute the point trajectory.
         """
-        row = self.match_df.iloc[self.point]
-        self.engine.reset()
-        self.point_data.first = row["1st"]
-        self.point_data.second = row["2nd"]
-        self.point_data.point = self.point_in_game
-        self.server = row["server"]
-        result = self.parser.run_point(self.point_data)
-        print(result)
+        point_data = PointData(
+            first=self.match_df.loc[self.point, "1st"],
+            second=self.match_df.loc[self.point, "2nd"],
+            point=self.point_in_game,
+            server=self.match_df.loc[self.point, "server"],
+            hand1=True,
+            hand2=True,
+        )
+        result = self.parser.run_point(point_data)
+        if not result:
+            self.next_point()
 
     def select_point(self, point: int) -> None:
         """
@@ -66,17 +66,13 @@ class Match:
         self.point = point
 
         # Current games
-        idx = self.point - 1
-        gm1 = self.match_df.iloc[idx]["Gm1"]
-        gm2 = self.match_df.iloc[idx]["Gm2"]
+        gm1 = self.match_df.loc[self.point, "Gm1"]
+        gm2 = self.match_df.loc[self.point, "Gm2"]
 
         # Find first point in the current game looping backward
-        i = idx
+        i = self.point
         count = 0
-        while (
-            self.match_df.iloc[i - 1]["Gm1"] == gm1
-            and self.match_df.iloc[i - 1]["Gm2"] == gm2
-        ):
+        while self.match_df.loc[i, "Gm1"] == gm1 and self.match_df.loc[i, "Gm2"] == gm2:
             count += 1
             i -= 1
 
@@ -113,9 +109,8 @@ class Match:
         """
         Getter method for player names.
         """
-        idx = self.point - 1
-        p1 = self.match_df.iloc[idx]["player 1"]
-        p2 = self.match_df.iloc[idx]["player 2"]
+        p1 = self.match_df.loc[self.point]["player 1"]
+        p2 = self.match_df.loc[self.point]["player 2"]
         return p1, p2
 
     @property
@@ -124,3 +119,12 @@ class Match:
         Getter method for the full trajectory
         """
         return self.engine.traj
+
+    def enrich(self):
+        """
+        This method should enrich the dataframe with extra
+        info scraped from wikipedia.
+
+        Specifically: handedness of the two players.
+        """
+        pass
