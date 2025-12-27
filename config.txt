@@ -1,3 +1,5 @@
 engine = "vpython" # options vpython, Panda3D, Qt
 
 file_name = "charting-m-points-2020s.csv"
+
+tournament_name = "US Open 2022"

@@ -8,9 +8,6 @@ This module bridges Match and Engine: it takes the point data
 and converts it to geometric quantities that can be passed to Engine.
 
 TO DO:
-- Order functions
-- Test functions
-- Refactor certain functions
 - Adjust time/position parameters
 - Implement higher diversity in shots (spin, fore/back-hand)
 """

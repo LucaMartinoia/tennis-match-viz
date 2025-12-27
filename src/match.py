@@ -9,8 +9,7 @@ for each point, computes the full trajectory of the ball.
 
 TO DO:
 - Enrich method
-- Order functions
-- Test functions
+- Fix boolean returns
 """
 
 
@@ -55,6 +54,13 @@ class Match:
         result = self.parser.run_point(point_data)
         # if not result:
         #    self.next_point()
+
+    @property
+    def trajectory(self):
+        """
+        Getter method for the full trajectory
+        """
+        return self.engine.traj
 
     def select_point(self, point: int) -> None:
         """
@@ -115,13 +121,6 @@ class Match:
         p1 = self.match_df.loc[self.point]["player 1"]
         p2 = self.match_df.loc[self.point]["player 2"]
         return p1, p2
-
-    @property
-    def trajectory(self):
-        """
-        Getter method for the full trajectory
-        """
-        return self.engine.traj
 
     def enrich(self):
         """

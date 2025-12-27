@@ -1,6 +1,6 @@
 from src.database import Database
 from src.match import Match
-from src.gui_vpython import TennisCourt
+from src.gui_vpython import GUI
 
 """
 TO DO:
@@ -33,14 +33,19 @@ if __name__ == "__main__":
     database.matches_list("US Open 2022")
     match_df = database.match_data("F - Ruud vs Alcaraz")
 
-    court = TennisCourt()
-    court.create()
+    tournament_list = database.tournaments_list()
 
-    match = Match(match_df)
+    gui = GUI()
+    gui.bind_GUI(database.matches_list)
+    gui.create(tournament_list)
+    # gui.set_default_tournament(t_name) # Read from config
 
-    print(match_df.head(20))
+    gui.update_match_data("Ruud", "Alcaraz", "US Open 2022")
+    for i in range(100):
+        gui.GUI_print("test")
+        gui.GUI_print("puzzo")
 
-    match.select_point(19)
-    match.point_trajectory()
+    match = Match()
 
-    court.animate_trajectory(match.trajectory)
+    gui.court.animate_trajectory(match.trajectory)
+    gui.wait()
