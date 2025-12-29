@@ -11,12 +11,12 @@ from vpython import (
     label,
     menu,
     button,
-    text,
 )
 from types import SimpleNamespace
 from src.engine import coordinates
 from datetime import datetime
 import numpy as np
+import os
 
 """
 This module manages the court GUI and animations.
@@ -25,10 +25,7 @@ The actual computation should go into dynamics.py. This module should be able to
 take the data from dynamics.py and apply a slow-motion algorithm by linearizing subsequent points.
 
 TO DO:
-- GUI with buttons: next point, previous point, select tournament, select match, slowmotion
-- Actual animation loop
 - Slowmotion
-- Wrapper functions to the GUI elements
 - Improve lighting (day/night) and camera (fix above surface)
 - Improve court render (correct size, court types)
 - Improve net render (curved net)
@@ -57,6 +54,7 @@ class GUI:
         self.bus.subscribe("match_metadata_updated", self.update_match_data)
         self.bus.subscribe("console-print", self.GUI_print)
         self.bus.subscribe("update-score", self.update_score_table)
+        self.bus.subscribe("trajectory", self.run_point)
 
         # Scene data
         self.scene_width = 1000
@@ -83,10 +81,10 @@ class GUI:
             resizable=False,
             autoscale=False,
         )
+        self.scene.bind("keydown", self.exit_program)
 
         # Create court
         self.court = TennisCourt(self.scene, self.p1, self.p2)
-        self.bus.subscribe("trajectory", self.court.animate_trajectory)
         self.scene.append_to_caption("\n")
         self.score = wtext(
             text=f"<div style='width: {self.scene_width}px; text-align: left;'>"
@@ -128,9 +126,21 @@ class GUI:
         # Initialize console
         wtext(text="\n\n<b>CONSOLE</b>\n\n")
         self.console = wtext(text="\n\n")
+        self.GUI_print("Press ESC or the Exit button to quit.")
 
     def wait(self):
         input("Press Enter to exit...")
+
+    def exit_program(self, evt):
+        """
+        Main exit point.
+        """
+        is_key_exit = hasattr(evt, "key") and evt.key in ("esc", "escape", "end")
+        is_button_exit = hasattr(evt, "text") and evt.text == "Exit"
+
+        if is_key_exit or is_button_exit:
+            self.scene.delete()
+            os._exit(0)
 
     def start_toggle(self):
         self.court.play = not self.court.play
@@ -234,7 +244,19 @@ class GUI:
         self.court.labelp1.text = self.p1
         self.court.labelp2.text = self.p2
 
-    # BUTTONS: tournament/match selector, animation speed, arrows to move between points inside the same match.
+        self.exit_button = button(
+            text="Exit", bind=self.exit_program, pos=self.scene.title_anchor
+        )
+
+    def run_point(self, traj):
+        """
+        Wrapper function for the animate_trajectory.
+        """
+        self.court.animate_trajectory(traj)
+
+        self.next_point()
+        # If the program quits on last point,
+        # try to have an emit from match and if match_point ->"pause".
 
 
 class TennisCourt:
