@@ -4,7 +4,6 @@ from src.gui_vpython import GUI
 
 """
 TO DO:
-- Write def main()
 - Check everything
 - Document every functions
 - Write README
@@ -31,19 +30,6 @@ class EventBus:
         return list(self._topics)
 
 
-# Callback for when a tournament is selected in the GUI
-def on_match_selected(match_name):
-    # Get the match dataframe from Database
-    database.set_match(match_name)
-    match_df = database.get_match_data()
-    # Pass it to Match
-    match.select_df(match_df)
-    # Emit an event that GUI can listen to
-    bus.emit("match_metadata_updated", metadata=database.get_match_metadata())
-    bus.emit("update-score", score=match.update_score_data())
-    match.select_point(1)
-
-
 if __name__ == "__main__":
 
     bus = EventBus()
@@ -52,12 +38,8 @@ if __name__ == "__main__":
     database = Database(bus)
     match = Match(bus)
 
-    # Subscribe to the event
-    bus.subscribe("tournament_selected", database.on_tournament_selected)
-    bus.subscribe("match_selected", on_match_selected)
-
-    tournament_list = database.tournaments_list()
-    gui.set_tournament_menu(tournament_list)
+    # Main entry point
+    database.load_tournament_list()
     # gui.set_default_tournament(t_name) # Read from config
 
     # gui.wait()

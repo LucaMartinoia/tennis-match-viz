@@ -5,7 +5,7 @@ import re
 """
 This module reads the CSV file as pandas dataframe, look for the rows
 associated with the match of interest, and convert the data in a format that
-can be passed to the dynamics and UI.
+can be passed to Match.
 
 TO DO:
 - Compute correct Gm missing values
@@ -22,9 +22,12 @@ class Database:
         """
         Load, clean and prepare the dataframe.
         """
-        # Load dataframe
+        # Initialize Event bus
         self.bus = bus
         self.bus.emit("console-print", text="Loading database...")
+        self.bus.subscribe("tournament-selected", self.on_tournament_selected)
+        self.bus.subscribe("match-selected", self.set_match)
+        # Load dataframe
         self.df, result_str = self._load_csv(fname)
         # Sanitizing missing entries
         self._sanitize_df()
@@ -79,14 +82,23 @@ class Database:
         """
         self.df[["TbSet", "Gm2"]] = self.df[["TbSet", "Gm2"]].ffill()
 
-    def on_tournament_selected(self, tournament):
+    def on_tournament_selected(self, tournament: str) -> None:
+        """
+        Callback function for when a tournament is selected.
+        """
         # Get the list of matches from the database
         match_list = self.matches_list(tournament)
-        # Emit a new event that the GUI can listen to
-        self.bus.emit("matches_updated", matches=match_list)
+        # Emit an event that the GUI can listen to
+        self.bus.emit("matches-ready", matches=self.matches_list(tournament))
         # Automatically trigger match selection for first match if list is non-empty
         if match_list:
-            self.bus.emit("match_selected", match_name=match_list[0])
+            self.set_match(match_list[0])
+
+    def load_tournament_list(self):
+        """
+        Hook to the tournament list creation.
+        """
+        self.bus.emit("tournament-list-ready", t_list=self.tournaments_list())
 
     def tournaments_list(self):
         """
@@ -104,13 +116,15 @@ class Database:
             raise ValueError(f"Tournament '{tournament}' not found in dataset.")
         self.tournament = tournament
 
-    def set_match(self, match: str):
+    def set_match(self, match_name: str):
         """
         Set tournament field.
         """
-        if match not in self.df["match"].values:
-            raise ValueError(f"Match '{match}' not found in dataset.")
-        self.match = match
+        if match_name not in self.df["match"].values:
+            raise ValueError(f"Match '{match_name}' not found in dataset.")
+        self.match = match_name
+        self.bus.emit("match-metadata-ready", metadata=self.get_match_metadata())
+        self.bus.emit("match-df-ready", match_df=self.get_match_data())
 
     def matches_list(self, tournament: str = ""):
         """

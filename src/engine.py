@@ -49,7 +49,7 @@ class Engine:
         self.v_fraction = 0.7  # TO DO: scale with court type
         self.friction = 0.85  # TO DO: scale with court type
         self.energy_loss_bounce = 0.65  # TO DO: scale with court type
-        self.fps = 60
+        self.fps = 100
 
     def serve(self, xf: float, yf: float, zf: float, T: float, right: bool):
         """

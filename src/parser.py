@@ -90,6 +90,7 @@ class Parser:
     def run_point(self, point_data) -> bool:
         """
         Entry point to compute the trajectory.
+
         Extract the point data and call the rallies.
         """
         # Extract point data
@@ -98,6 +99,7 @@ class Parser:
         server = point_data.server
         # First serve attempt
         if point_data.first[0]:
+            self.engine.pause(1.0)
             result = self._run_rally(
                 point_data.first, point_in_game, righthanded, server
             )
