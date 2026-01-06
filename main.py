@@ -41,5 +41,3 @@ if __name__ == "__main__":
     # Main entry point
     database.load_tournament_list()
     # gui.set_default_tournament(t_name) # Read from config
-
-    # gui.wait()

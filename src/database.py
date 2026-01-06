@@ -18,25 +18,27 @@ class Database:
     Load the database and extract match data.
     """
 
-    def __init__(self, bus, fname: str = "charting-m-points-2020s.csv"):
+    def __init__(self, bus, fname: str = "charting-m-points-2020s.csv") -> None:
         """
         Load, clean and prepare the dataframe.
         """
         # Initialize Event bus
         self.bus = bus
-        self.bus.emit("console-print", text="Loading database...")
+        # Callbacks to GUI buttons
         self.bus.subscribe("tournament-selected", self.on_tournament_selected)
         self.bus.subscribe("match-selected", self.set_match)
         # Load dataframe
+        self.bus.emit("console-print", text="Loading database...")
         self.df, result_str = self._load_csv(fname)
         # Sanitizing missing entries
         self._sanitize_df()
-        # Expand the database withn useful fields
+        # Expand the database with useful fields
         self._expand_df_fields()
         # Tournament and match fields
         self.tournament = ""
         self.match = ""
         self.court = ""
+        # Print result
         self.bus.emit("console-print", text=result_str)
 
     def _load_csv(self, fname: str):
@@ -67,6 +69,7 @@ class Database:
                 },
                 keep_default_na=True,
             )
+        # Handling exceptions
         except FileNotFoundError:
             raise FileNotFoundError(f"CSV file not found at {fpath}")
         except pd.errors.DtypeWarning as e:
@@ -76,7 +79,7 @@ class Database:
 
         return df, "Data loaded successfully."
 
-    def _sanitize_df(self):
+    def _sanitize_df(self) -> None:
         """
         Clean dataframe from incorrect entries.
         """
@@ -85,30 +88,27 @@ class Database:
     def on_tournament_selected(self, tournament: str) -> None:
         """
         Callback function for when a tournament is selected.
+
+        Find the matches associated with selected tournaments.
         """
         # Get the list of matches from the database
         match_list = self.matches_list(tournament)
         # Emit an event that the GUI can listen to
-        self.bus.emit("matches-ready", matches=self.matches_list(tournament))
+        self.bus.emit("match-list-ready", matches=self.matches_list(tournament))
         # Automatically trigger match selection for first match if list is non-empty
         if match_list:
             self.set_match(match_list[0])
 
-    def load_tournament_list(self):
-        """
-        Hook to the tournament list creation.
-        """
-        self.bus.emit("tournament-list-ready", t_list=self.tournaments_list())
-
-    def tournaments_list(self):
+    def load_tournament_list(self) -> None:
         """
         Return the full list of unique tournaments.
-
-        str: "tournament_name year"
         """
-        return self.df["tournament_full"].astype(str).unique().tolist()
+        # Find list of unique tournaments
+        t_list = self.df["tournament_full"].astype(str).unique().tolist()
+        # Emit signal with tournament list
+        self.bus.emit("tournament-list-ready", t_list=t_list)
 
-    def set_tournament(self, tournament: str):
+    def set_tournament(self, tournament: str) -> None:
         """
         Set tournament field.
         """
@@ -116,15 +116,16 @@ class Database:
             raise ValueError(f"Tournament '{tournament}' not found in dataset.")
         self.tournament = tournament
 
-    def set_match(self, match_name: str):
+    def set_match(self, match_name: str) -> None:
         """
         Set tournament field.
         """
         if match_name not in self.df["match"].values:
             raise ValueError(f"Match '{match_name}' not found in dataset.")
         self.match = match_name
+        # When match is selected, emit dataframe and metadata (order matters!)
         self.bus.emit("match-metadata-ready", metadata=self.get_match_metadata())
-        self.bus.emit("match-df-ready", match_df=self.get_match_data())
+        self.bus.emit("match-df-ready", match_df=self.get_match_dataframe())
 
     def matches_list(self, tournament: str = ""):
         """
@@ -139,7 +140,7 @@ class Database:
 
     def get_match_metadata(self):
         """
-        Getter method for players and match name.
+        Get match metadata, such as player names and tournament.
         """
         df_match = self.df[self.df["match"] == self.match]
         # Take first row as representative
@@ -147,9 +148,10 @@ class Database:
         p1 = row["p1"]
         p2 = row["p2"]
         match_name = row["match"]
-        return p1, p2, match_name, self.tournament
+        n_points = len(df_match)
+        return p1, p2, match_name, self.tournament, n_points
 
-    def get_match_data(self, match: str = ""):
+    def get_match_dataframe(self, match: str = ""):
         """
         Return dataframe with list of points in useful form
         """
@@ -212,7 +214,7 @@ class Database:
 
         return parts
 
-    def _expand_df_fields(self):
+    def _expand_df_fields(self) -> None:
         """
         Parse match_id for every row and expand the dataframe with:
         - date (YYYY-MM-DD)

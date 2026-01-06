@@ -32,6 +32,7 @@ class Match:
         """
         Loads the match data and keep track of points.
         """
+        # Initialize Event bus
         self.bus = bus
         self.bus.subscribe("change-point", self.on_change_point)
         self.bus.subscribe("match-df-ready", self.set_df)
@@ -45,14 +46,12 @@ class Match:
         self.parser = Parser(self.engine)
         self.autoplay = True
 
-    def set_df(self, match_df):
+    def set_df(self, match_df) -> None:
         """
-        Setter function for the match dataframe.
+        Set the match dataframe.
         """
         # Set new dataframe
         self.match_df = match_df
-
-        print(self.match_df.head(10))
         # Set to first point
         self.set_point(1)
 
@@ -60,6 +59,7 @@ class Match:
         """
         Entry point to compute the point trajectory.
         """
+        # Gather point data
         point_data = PointData(
             first=self.match_df.loc[self.point, "1st"],
             second=self.match_df.loc[self.point, "2nd"],
@@ -68,11 +68,19 @@ class Match:
             righthand1=True,
             righthand2=True,
         )
+        # Reset the state of engine
         self.engine.reset()
+        # Compute the point trajectory
         result = self.parser.run_point(point_data)
         if result:
+            # If trajectory is computed correctly, emit it
             self.bus.emit("trajectory-ready", traj=self.trajectory)
         else:
+            # Otherwise, skip to next point
+            self.bus.emit(
+                "console-print",
+                text=f"Point {self.point} information is missing. Skipping to the next point.",
+            )
             self.bus.emit("change-point", next=True)
 
     @property
@@ -89,11 +97,9 @@ class Match:
         """
         # Assign new point
         self.point = point
-
         # Current games
         gm1 = self.match_df.loc[self.point, "Gm1"]
         gm2 = self.match_df.loc[self.point, "Gm2"]
-
         # Find first point in the current game looping backward
         i = self.point - 1
         count = 0
@@ -104,61 +110,85 @@ class Match:
         ):
             count += 1
             i -= 1
-
         # 0-based count within the game
         self.point_in_game = count
         # Callback to update score on the GUI
         self.bus.emit("update-score", score=self.get_score_data())
+        self.bus.emit("point-data-ready", data=self.get_point_data())
         # Compute the point trajectory
         self._point_trajectory()
 
-    def on_change_point(self, next: bool):
+    def on_change_point(self, next: bool) -> None:
         """
-        Callback method to Next/Previous point GUI buttons.
+        Callback method to change point GUI buttons.
 
-        Change the current point.
+        Change the current point and compute the trajectory.
         """
         if self.match_df is None or self.match_df.empty:
             return  # Nothing to do if no match loaded
-
         new_point = self.point + 1 if next else self.point - 1
         # Bounds check
-        if 1 <= new_point < len(self.match_df):
-            self.set_point(new_point)
-        elif new_point == len(self.match_df):
-            self.bus.emit("match-point")  ## TODO: Not working
+        if 1 <= new_point <= len(self.match_df):
             self.set_point(new_point)
 
-    def on_animation_finished(self):
+    def on_animation_finished(self) -> None:
+        """
+        Callback function to when the GUI completes the animation.
+        """
+        # If animation is complete, move to next point automatically
         if self.autoplay:
             self.bus.emit("change-point", next=True)
 
     def on_animation_interrupted(self):
+        """
+        Callback function to when the GUI is interrupted during animation.
+        """
         # Resend trajectory for current point
         self.bus.emit("trajectory-ready", traj=self.trajectory)
 
     def get_score_data(self):
+        """
+        Get current point score for the GUI.
+        """
+        # If data is missing, return 0 in all score fields
         if self.match_df is None or self.match_df.empty:
             return 0, 0, 0, 0, 0, 0
 
         row = self.match_df.loc[self.point]
-
+        # Gather score. If data is missing, fallback to 0
         set1 = row.get("Set1", 0)
         set2 = row.get("Set2", 0)
         gm1 = row.get("Gm1", 0)
         gm2 = row.get("Gm2", 0)
         pts_str = str(row.get("Pts", "0-0"))
+        server = row.get("Svr", 0)
         try:
             pts1_str, pts2_str = pts_str.split("-")
             pts1, pts2 = pts1_str, pts2_str
         except ValueError:
             self.bus.emit("console-print", text=f"Score data is missing: {pts_str}")
             pts1, pts2 = 0, 0
-        return set1, set2, gm1, gm2, pts1, pts2
+        return set1, set2, gm1, gm2, pts1, pts2, server
+
+    def get_point_data(self):
+        """
+        Get current point data for the GUI.
+        """
+        row = self.match_df.loc[self.point]
+        second = False if row["2nd"] else True
+        # Find aces
+        ace = 0
+        if row["1st"] and row["1st"][0] and row["1st"][0][-1] == "*":
+            ace = 1
+        elif row["2nd"] and row["2nd"][0] and row["2nd"][0][-1] == "*":
+            ace = 2
+        pt_winner = row["PtWinner"]
+        # Return point data
+        return self.point, second, ace, pt_winner
 
     def reset_all(self) -> None:
         """
-        Setter method for the point in the match.
+        Reset all data and the engine.
         """
         self.point_in_game = 0  # To compute the quadrant of the server
         self.point = 1  # Point under consideration

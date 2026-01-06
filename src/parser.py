@@ -110,9 +110,9 @@ class Parser:
                 result = self._run_rally(
                     point_data.second, point_in_game, righthanded, server
                 )
-            else:
-                # If both serves are missing
-                return False
+        else:
+            # If both serves are missing
+            return False
 
         # Mirror depending on server side
         self._side_selection(server)

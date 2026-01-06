@@ -44,15 +44,17 @@ class GUI:
         """
         Creates the GUI and scene.
         """
-        # Bus initialization and subscriptions
+        # Initialize Event bus
         self.bus = bus
         self.bus.subscribe("tournament-list-ready", self.fill_tournament_menu)
-        self.bus.subscribe("matches-ready", self.update_match_menu)
-        self.bus.subscribe("match-metadata-ready", self.update_match_data)
+        self.bus.subscribe("tournament-list-ready", self.heartbeat)
+        self.bus.subscribe("match-list-ready", self.update_match_menu)
+        self.bus.subscribe("match-metadata-ready", self.update_match_metadata)
         self.bus.subscribe("console-print", self.GUI_print)
         self.bus.subscribe("update-score", self.update_score_table)
         self.bus.subscribe("trajectory-ready", self.run_point)
         self.bus.subscribe("play-toggle", self.play_toggle)
+        self.bus.subscribe("point-data-ready", self.point_data)
 
         # Scene data
         self.scene_width = 1000
@@ -62,6 +64,12 @@ class GUI:
         self.title = "\n\n\n\n\n\n\n"
         self.p1 = "\t\t"
         self.p2 = "\t\t"
+        self.winner = ""
+        self.server = ""
+        self.n_points = 0
+        self.point = 0
+        self.second = False
+        self.ace = 0
         self.set1 = 0
         self.set2 = 0
         self.game1 = 0
@@ -82,6 +90,7 @@ class GUI:
 
         # Bind ESC to quit program
         self.scene.bind("keydown", self.exit_program)
+        self.scene.append_to_title("\t" * 23 + "     ")
         self.button_exit = button(
             text="Exit", bind=self.exit_program, pos=self.scene.title_anchor
         )
@@ -140,7 +149,8 @@ class GUI:
         # Initialize console
         wtext(text="\n\n<b>CONSOLE</b>\n\n")
         self.console = wtext(text="\n\n")
-        wtext(text="Press ESC or the Exit button to quit.\n\n")
+        self.GUI_print("Welcome to TennisPointVisualizer!")
+        self.GUI_print("Press ESC or the Exit button to quit.")
 
     def exit_program(self, evt) -> None:
         """
@@ -155,12 +165,27 @@ class GUI:
             self.scene.delete()
             os._exit(0)
 
+    def heartbeat(self, t_list=None) -> None:
+        """
+        Heartbeat to keep scene alive after animation has finished.
+        """
+        # Create a hidden sphere
+        heart = sphere(
+            pos=vector(0, -1, 0),
+            radius=0.01,
+            color=color.red,
+            visible=False,
+        )
+        # Keep rotating the sphere once per second
+        while True:
+            rate(1)
+            heart.rotate(axis=vector(0, 1, 0), angle=0.01, origin=vector(0, 0, 0))
+
     def play_toggle(self, evt=None) -> None:
         """
         Bind method for the Play/Pause button.
         """
         # Toggle Play and Pause
-        print(f"reading play-toggle {not self.court.play}")
         self.court.play = not self.court.play
         self.button_play.text = " Play ▶ " if self.court.play else " Pause ❚❚ "
 
@@ -174,29 +199,52 @@ class GUI:
         else:
             self.bus.emit("change-point", next=True)
 
+    def point_data(self, data) -> None:
+        """
+        Callback to set the point data.
+        """
+        self.point, self.second, self.ace, self.winner = data
+
     def update_score_table(self, score) -> None:
         """
         Bind method for the "update-score" signal.
 
         Update the score table.
         """
-        self.set1, self.set2, self.game1, self.game2, self.point1, self.point2 = score
+        (
+            self.set1,
+            self.set2,
+            self.game1,
+            self.game2,
+            self.point1,
+            self.point2,
+            self.server,
+        ) = score
+        dot = ["", ""]
+        if self.server == 1:
+            dot[0] = "S"
+        elif self.server == 2:
+            dot[1] = "S"
+
         self.score.text = (
             f"<div style='width: {self.scene_width}px; text-align: left;'>"
-            "<table style='border-collapse:collapse;margin-left:0;margin-right:auto;font-size:16px;'>"
+            "<table style='border-collapse:collapse;margin-left:0;margin-right:auto;font-size:16px;table-layout: fixed;'>"
             "<tr>"
+            "<td style='width:24px;'></td>"
             "<td style='border:1px solid white;padding:6px;'>Player</td>"
             "<td style='border:1px solid white;padding:6px;'>Set</td>"
             "<td style='border:1px solid white;padding:6px;'>Game</td>"
             "<td style='border:1px solid white;padding:6px;'>Point</td>"
             "</tr>"
             "<tr>"
+            f"<td style='width:24px;text-align:center;border:none;'>{dot[0]}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.p1}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.set1}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.game1}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.point1}</td>"
             "</tr>"
             "<tr>"
+            f"<td style='width:24px;text-align:center;border:none;'>{dot[1]}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.p2}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.set2}</td>"
             f"<td style='border:1px solid white;padding:6px;'>{self.game2}</td>"
@@ -216,9 +264,9 @@ class GUI:
         # Manual call of the binders on creation
         self.tournament_binder(self.menu_tournament)
 
-    def set_default_tournament(self, t_default):
+    def set_default_tournament(self, t_default) -> None:
         """
-        Set default tournament.
+        Set default tournament. TO DO
         """
         self.menu_tournament.selected = t_default
 
@@ -256,12 +304,12 @@ class GUI:
         # Emit signal on the bus to start computing point data
         self.bus.emit("match-selected", match_name=menu.selected)
 
-    def update_match_data(self, metadata) -> None:
+    def update_match_metadata(self, metadata) -> None:
         """
         Update the match data (title and labels).
         """
         # Gather match metadata
-        self.p1, self.p2, match, tournament = metadata
+        self.p1, self.p2, match, tournament, self.n_points = metadata
         # Set the title
         self.title = (
             f"\n<div style='width: {self.scene_width}px; text-align: center;font-size:18px;'>"
@@ -273,6 +321,7 @@ class GUI:
         self.court.labelp1.text = self.p1
         self.court.labelp2.text = self.p2
         # Recreate the exit button
+        self.scene.append_to_title("\t" * 23 + "     ")
         self.button_exit = button(
             text="Exit", bind=self.exit_program, pos=self.scene.title_anchor
         )
@@ -281,23 +330,18 @@ class GUI:
         """
         Wrapper function to animate_trajectory.
         """
+        # Increase animation id counter
         self.court.anim_id += 1
         current_id = self.court.anim_id
-        # Animate the point
+        # If not already animating, animate the point
         if not self.court.animating:
             finished = self.court._animate_trajectory(traj, current_id)
-            # When finished, call next point
-            # self.wait()
+            # Emit when finished
             if finished:
                 self.bus.emit("animation-finished")
             else:
                 # If it does not work, emit to ask the current trajectory
                 self.bus.emit("animation-interrupted")
-        # If the program quits on last point,
-        # try to have an emit from match and if match_point ->"pause".
-
-    def wait(self) -> None:
-        input("Press Enter to exit...")
 
 
 class TennisCourt:
@@ -395,8 +439,8 @@ class TennisCourt:
             height=20,
         )
 
-        # Serve label
-        self.serve = label(
+        # Info label
+        self.info = label(
             text="",
             pos=vector(0, 10, 0),
             visible=False,
@@ -436,13 +480,13 @@ class TennisCourt:
                         self.ball.clear_trail()
                         self.ball.visible = False
                         self.ball.make_trail = False
-                        self.serve.text = "First serve" if i <= 100 else "Second serve"
-                        self.serve.visible = True
+                        self.info.text = "First serve" if i <= 100 else "Second serve"
+                        self.info.visible = True
                     else:
                         self.ball.visible = True
                         self.ball.make_trail = True
-                        self.serve.text = ""
-                        self.serve.visible = False
+                        self.info.text = ""
+                        self.info.visible = False
                     # Update ball position
                     self.ball.pos = vector(float(p[0]), float(p[1]), float(p[2]))
                     i += 1
