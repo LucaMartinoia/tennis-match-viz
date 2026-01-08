@@ -6,8 +6,8 @@ This module is the physic engine: it takes the initial and final position
 and computes the full trajectory of the ball.
 
 TO DO:
-- Adjust parameters
 - Spin effects
+- Per court-type parameters
 """
 
 
@@ -47,8 +47,8 @@ class Engine:
         self.traj = np.empty((0, 3))  # One point per timestep
         self.court = court
         self.v_fraction = 0.7  # TO DO: scale with court type
-        self.friction = 0.85  # TO DO: scale with court type
-        self.energy_loss_bounce = 0.65  # TO DO: scale with court type
+        self.friction = 0.90  # TO DO: scale with court type
+        self.energy_loss_bounce = 0.70  # TO DO: scale with court type
         self.fps = 100
 
     def serve(self, xf: float, yf: float, zf: float, T: float, right: bool):
@@ -278,7 +278,7 @@ class Engine:
         dt = 1 / self.fps
         return np.arange(0, T + dt, dt)
 
-    def pause(self, T: float):
+    def pause(self, T: float) -> None:
         """
         Append empty vectors for T seconds.
         """
@@ -286,7 +286,7 @@ class Engine:
         pause_traj = np.full((len(t), 3), np.nan)
         self.traj = np.vstack((self.traj, pause_traj))
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Reset the trajectory to null state.
         """
@@ -304,7 +304,7 @@ class Engine:
         """
         return self.traj[-1]
 
-    def apply_symmetry(self, lambdax: int = 1, lambdaz: int = 1):
+    def apply_symmetry(self, lambdax: int = 1, lambdaz: int = 1) -> None:
         """
         Apply symmetry to the trajectory.
         lambdax, lambdaz: +1 or -1. -1 flips the respective axis.

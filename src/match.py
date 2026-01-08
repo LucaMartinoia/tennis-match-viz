@@ -6,10 +6,6 @@ from dataclasses import dataclass
 """
 This module manages the core logic: it takes the match database and,
 for each point, computes the full trajectory of the ball.
-
-TO DO:
-- Enrich method
-- Fix boolean returns
 """
 
 
@@ -52,8 +48,9 @@ class Match:
         """
         # Set new dataframe
         self.match_df = match_df
-        # Set to first point
-        self.set_point(1)
+        # Set to first point in
+        first_index = self.match_df.index[0]
+        self.set_point(first_index)
 
     def _point_trajectory(self) -> None:
         """
@@ -81,7 +78,7 @@ class Match:
                 "console-print",
                 text=f"Point {self.point} information is missing. Skipping to the next point.",
             )
-            self.bus.emit("change-point", next=True)
+            self.bus.emit("change-point", point="next")
 
     @property
     def trajectory(self):
@@ -118,7 +115,7 @@ class Match:
         # Compute the point trajectory
         self._point_trajectory()
 
-    def on_change_point(self, next: bool) -> None:
+    def on_change_point(self, point: str) -> None:
         """
         Callback method to change point GUI buttons.
 
@@ -126,7 +123,14 @@ class Match:
         """
         if self.match_df is None or self.match_df.empty:
             return  # Nothing to do if no match loaded
-        new_point = self.point + 1 if next else self.point - 1
+        if point == "first":
+            new_point = self.match_df.index[0]
+        elif point == "previous":
+            new_point = self.point - 1
+        elif point == "next":
+            new_point = self.point + 1
+        elif point == "last":
+            new_point = self.match_df.index[-1]
         # Bounds check
         if 1 <= new_point <= len(self.match_df):
             self.set_point(new_point)
@@ -137,9 +141,9 @@ class Match:
         """
         # If animation is complete, move to next point automatically
         if self.autoplay:
-            self.bus.emit("change-point", next=True)
+            self.bus.emit("change-point", point="next")
 
-    def on_animation_interrupted(self):
+    def on_animation_interrupted(self) -> None:
         """
         Callback function to when the GUI is interrupted during animation.
         """
@@ -190,15 +194,6 @@ class Match:
         """
         Reset all data and the engine.
         """
-        self.point_in_game = 0  # To compute the quadrant of the server
-        self.point = 1  # Point under consideration
         self.engine.reset()
-
-    def enrich(self):
-        """
-        This method should enrich the dataframe with extra
-        info scraped from wikipedia.
-
-        Specifically: handedness of the two players.
-        """
-        pass
+        first_index = self.match_df.index[0]
+        self.set_point(first_index)

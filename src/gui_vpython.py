@@ -4,12 +4,15 @@ from vpython import (
     color,
     vector,
     sphere,
-    distant_light,
+    local_light,
     rate,
     wtext,
     label,
     menu,
     button,
+    slider,
+    checkbox,
+    bumpmaps,
 )
 from types import SimpleNamespace
 from src.engine import coordinates
@@ -21,15 +24,14 @@ import os
 This module manages the court GUI and animations.
 
 TO DO:
-- Slowmotion
-- Improve lighting (day/night) and camera (fix above surface)
-- Improve court render (correct size, court types)
-- Improve net render (curved net)
-- Improve ball render (spin, trail, and mash)
+- Improve net (curved net)
+- Improve ball (spin)
+- Improve court bumpmaps/lightings
 """
+
 # Available court textures
 COURT_TEXTURES = {
-    "hard": "assets/tennis_court_background.jpg",
+    "hard": "assets/tennis_court_hard.jpg",
     "clay": "assets/tennis_court_clay.jpg",
     "grass": "assets/tennis_court_grass.jpg",
 }
@@ -40,7 +42,7 @@ class GUI:
     This class defines the canva and the GUI.
     """
 
-    def __init__(self, bus) -> None:
+    def __init__(self, bus, tournament_default) -> None:
         """
         Creates the GUI and scene.
         """
@@ -59,9 +61,11 @@ class GUI:
         # Scene data
         self.scene_width = 1000
         self.bg_color = color.black
+        self.day = True
 
         # Match data
-        self.title = "\n\n\n\n\n\n\n"
+        self.tournament_default = tournament_default
+        self.title = "\n\n\n\n\n"
         self.p1 = "\t\t"
         self.p2 = "\t\t"
         self.winner = ""
@@ -82,79 +86,118 @@ class GUI:
             title=self.title,
             width=self.scene_width,
             height=self.scene_width * 10 // 20,
-            center=vector(0, 8, 0),
+            center=vector(0, 2, 0),
+            forward=vector(0, -0.5, 1),
             background=self.bg_color,
             resizable=False,
             autoscale=False,
         )
 
+        # Lighting
+        self.lights(self.day)
+
         # Bind ESC to quit program
         self.scene.bind("keydown", self.exit_program)
-        self.scene.append_to_title("\t" * 23 + "     ")
+        self.scene.append_to_title(" " * 186 * (self.scene_width // 1000))
         self.button_exit = button(
-            text="Exit", bind=self.exit_program, pos=self.scene.title_anchor
+            text="Exit ✖", bind=self.exit_program, pos=self.scene.title_anchor
         )
 
         # Create court
         self.court = TennisCourt(self.scene, self.p1, self.p2)
 
         # Empty score table
-        self.scene.append_to_caption("\n")
         self.score = wtext(
-            text=f"<div style='width: {self.scene_width}px; text-align: left;'>"
-            "<table style='border-collapse:collapse;margin-left:0;margin-right:auto;font-size:16px;'>"
-            "<tr>"
-            "<td style='border:1px solid white;padding:6px;'>Player</td>"
-            "<td style='border:1px solid white;padding:6px;'>Set</td>"
-            "<td style='border:1px solid white;padding:6px;'>Game</td>"
-            "<td style='border:1px solid white;padding:6px;'>Point</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.p1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.set1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.game1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.point1}</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.p2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.set2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.game2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.point2}</td>"
-            "</tr>"
-            "</table>"
-            "</div>\n"
+            text=f"""
+            <div style='width: {self.scene_width}px; text-align: center; margin-top: -50; margin-bottom: -35; padding: 0;'>
+                <table style='border-collapse: collapse; margin: 0 auto; font-size:16px; table-layout: fixed;'>
+                    <tr>
+                        <td style='width:24px;'></td>
+                        <td style='border:none;padding:6px;'></td>
+                        <td style='border:1px solid white;padding:6px;'>Set</td>
+                        <td style='border:1px solid white;padding:6px;'>Game</td>
+                        <td style='border:1px solid white;padding:6px;'>Point</td>
+                    </tr>
+                    <tr>
+                        <td style='width:24px;text-align:center;border:none;'> </td>
+                        <td style='border:1px solid white;padding:6px;'>{self.p1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.set1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.game1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.point1}</td>
+                    </tr>
+                    <tr>
+                        <td style='width:24px;text-align:center;border:none;'> </td>
+                        <td style='border:1px solid white;padding:6px;'>{self.p2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.set2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.game2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.point2}</td>
+                    </tr>
+                </table>
+                <hr style='border:1px solid white; width:80%; margin: -15px auto 0 auto;'/>
+            </div>
+            """
         )
 
+        #######################
         # Menu and buttons
+        #######################
+
+        # Play/Pause
+        self.scene.append_to_caption("\t\t\t\t")
+        self.button_play = button(bind=self.play_toggle, text="")
+        if self.court.play:
+            self.button_play.text = "    Play ▷ "
+        else:
+            self.button_play.text = " Pause ❚❚ "
+        # Slowmotion slider
+        self.scene.append_to_caption("\t\tBall speed: 1%")
+        self.slider_slowmotion = slider(
+            bind=self.slowmotion, min=1, max=100, value=100, length=200
+        )
+        self.scene.append_to_caption("100%")
+        # Dark/light button switch
+        self.scene.append_to_caption("\t\t")
+        self.checkbox_night = checkbox(bind=self.day_toggle, text="Night mode")
+        if self.day:
+            self.checkbox_night.checked = False
+        else:
+            self.checkbox_night.checked = True
         # Tournament menu
+        self.scene.append_to_caption("\n\n\tSelect match:\t\t")
         self.menu_tournament = menu(
             bind=self.tournament_binder, choices=[""], selected=""
         )
         # Match menu
         self.menu_match = menu(bind=self.match_binder, choices=[""], selected="")
-        self.scene.append_to_caption("\t\t")
-        # Play/Pause button
-        self.button_play = button(bind=self.play_toggle, text="")
-        if self.court.play:
-            self.button_play.text = " Play ▶ "
-        else:
-            self.button_play.text = " Pause ❚❚ "
-        self.scene.append_to_caption("\t\t")
+        # First point button
+        self.scene.append_to_caption("\n\n\tSelect point:\t\t")
+        self.button_first = button(bind=self.change_point, text=" ⏮ ")
+        self.scene.append_to_caption(" ")
         # Next point button
-        self.button_next = button(bind=self.change_point, text=" ⇦ ")
+        self.button_next = button(bind=self.change_point, text=" ◀ ")
+        self.scene.append_to_caption("\t")
+        # Previous point button
+        self.button_previous = button(bind=self.change_point, text=" ▶ ")
         self.scene.append_to_caption(" ")
         # Previous point button
-        self.button_next = button(bind=self.change_point, text=" ⇨ ")
+        self.button_last = button(bind=self.change_point, text=" ⏭ ")
 
         # Initialize console
-        wtext(text="\n\n<b>CONSOLE</b>\n\n")
-        self.console = wtext(text="\n\n")
+        wtext(
+            text=f"""
+            <div style='width: {self.scene_width}px; text-align: left; padding: 0; margin: 0;'>
+                <hr style='border:1px solid white; width:80%; margin: -15px auto -45px auto;'/>
+            </div>
+            """
+        )
+        wtext(text=f"\n\t<b>CONSOLE</b>\n\n")
+        self.console = wtext(text="\n\n\t")
         self.GUI_print("Welcome to TennisPointVisualizer!")
         self.GUI_print("Press ESC or the Exit button to quit.")
 
     def exit_program(self, evt) -> None:
         """
-        Main exit point.
+        Program exit point.
         """
         # Check if called from button press or key press
         is_key_exit = hasattr(evt, "key") and evt.key in ("esc", "escape", "end")
@@ -187,17 +230,55 @@ class GUI:
         """
         # Toggle Play and Pause
         self.court.play = not self.court.play
-        self.button_play.text = " Play ▶ " if self.court.play else " Pause ❚❚ "
+        self.button_play.text = "    Play ▷ " if self.court.play else " Pause ❚❚ "
+
+    def day_toggle(self, evt) -> None:
+        """
+        Bind method for the light/dark mode switch.
+        """
+        flag = False if evt.checked else True
+        self.lights(flag)
+
+    def lights(self, day_flag: bool) -> None:
+        """
+        Method to set light/dark mode.
+        """
+        # Reset lights
+        self.scene.lights = []
+        if day_flag:
+            # Bright ambient light, no lightings
+            self.scene.background = color.white
+            self.scene.ambient = color.white * 1
+        else:
+            # Dim ambient light, local lights
+            self.scene.background = color.black
+            self.scene.ambient = color.white * 0.05
+            local_light(pos=vector(18, 8, -8), color=color.white * 0.25)
+            local_light(pos=vector(-18, 8, -8), color=color.white * 0.25)
+            local_light(pos=vector(-18, 8, 8), color=color.white * 0.25)
+            local_light(pos=vector(18, 8, 8), color=color.white * 0.25)
+            local_light(pos=vector(0, 8, 8), color=color.white * 0.25)
+            local_light(pos=vector(0, 8, -8), color=color.white * 0.25)
+
+    def slowmotion(self, evt) -> None:
+        """
+        Bind method for the slowmotion slider.
+        """
+        self.court.rate = self.slider_slowmotion.value
 
     def change_point(self, evt) -> None:
         """
         Bind method for the change point buttons.
         """
         # Emit signal "change-point"
-        if evt.text == " ⇦ ":
-            self.bus.emit("change-point", next=False)
-        else:
-            self.bus.emit("change-point", next=True)
+        if evt.text == " ⏮ ":
+            self.bus.emit("change-point", point="first")
+        elif evt.text == " ◀ ":
+            self.bus.emit("change-point", point="previous")
+        elif evt.text == " ▶ ":
+            self.bus.emit("change-point", point="next")
+        elif evt.text == " ⏭ ":
+            self.bus.emit("change-point", point="last")
 
     def point_data(self, data) -> None:
         """
@@ -222,37 +303,38 @@ class GUI:
         ) = score
         dot = ["", ""]
         if self.server == 1:
-            dot[0] = "S"
+            dot[0] = "●"
         elif self.server == 2:
-            dot[1] = "S"
+            dot[1] = "●"
 
-        self.score.text = (
-            f"<div style='width: {self.scene_width}px; text-align: left;'>"
-            "<table style='border-collapse:collapse;margin-left:0;margin-right:auto;font-size:16px;table-layout: fixed;'>"
-            "<tr>"
-            "<td style='width:24px;'></td>"
-            "<td style='border:1px solid white;padding:6px;'>Player</td>"
-            "<td style='border:1px solid white;padding:6px;'>Set</td>"
-            "<td style='border:1px solid white;padding:6px;'>Game</td>"
-            "<td style='border:1px solid white;padding:6px;'>Point</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='width:24px;text-align:center;border:none;'>{dot[0]}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.p1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.set1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.game1}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.point1}</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='width:24px;text-align:center;border:none;'>{dot[1]}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.p2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.set2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.game2}</td>"
-            f"<td style='border:1px solid white;padding:6px;'>{self.point2}</td>"
-            "</tr>"
-            "</table>"
-            "</div>\n"
-        )
+        self.score.text = f"""
+            <div style='width: {self.scene_width}px; text-align: center; margin-top: -50; margin-bottom:-35; padding: 0;'>
+                <table style='border-collapse: collapse; margin: 0 auto; font-size:16px; table-layout: fixed;'>
+                    <tr>
+                        <td style='width:24px;'></td>
+                        <td style='border:none;padding:6px;'></td>
+                        <td style='border:1px solid white;padding:6px;'>Set</td>
+                        <td style='border:1px solid white;padding:6px;'>Game</td>
+                        <td style='border:1px solid white;padding:6px;'>Point</td>
+                    </tr>
+                    <tr>
+                        <td style='width:24px;text-align:center;border:none;'>{dot[0]}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.p1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.set1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.game1}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.point1}</td>
+                    </tr>
+                    <tr>
+                        <td style='width:24px;text-align:center;border:none;'>{dot[1]}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.p2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.set2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.game2}</td>
+                        <td style='border:1px solid white;padding:6px;'>{self.point2}</td>
+                    </tr>
+                </table>
+                <hr style='border:1px solid white; width:80%; margin: -15px auto 0 auto;'/>
+            </div>
+            """
 
     def fill_tournament_menu(self, t_list) -> None:
         """
@@ -260,7 +342,10 @@ class GUI:
         """
         # Set the tournament choices and selected entry
         self.menu_tournament.choices = t_list
-        self.menu_tournament.selected = t_list[0]
+        if self.tournament_default in t_list:
+            self.menu_tournament.selected = self.tournament_default
+        else:
+            self.menu_tournament.selected = t_list[0]
         # Manual call of the binders on creation
         self.tournament_binder(self.menu_tournament)
 
@@ -275,7 +360,7 @@ class GUI:
         Print text to the GUI console, keeping only the last max_lines entries.
         """
         ts = datetime.now().strftime("%H:%M:%S")
-        new_line = f"[{ts}] CONSOLE: {text}"
+        new_line = f"\t[{ts}]: {text}"
 
         lines = self.console.text.splitlines()
         lines.insert(0, new_line)
@@ -309,7 +394,7 @@ class GUI:
         Update the match data (title and labels).
         """
         # Gather match metadata
-        self.p1, self.p2, match, tournament, self.n_points = metadata
+        self.p1, self.p2, match, tournament, self.n_points, court = metadata
         # Set the title
         self.title = (
             f"\n<div style='width: {self.scene_width}px; text-align: center;font-size:18px;'>"
@@ -321,10 +406,12 @@ class GUI:
         self.court.labelp1.text = self.p1
         self.court.labelp2.text = self.p2
         # Recreate the exit button
-        self.scene.append_to_title("\t" * 23 + "     ")
+        self.scene.append_to_title(" " * 186 * (self.scene_width // 1000))
         self.button_exit = button(
-            text="Exit", bind=self.exit_program, pos=self.scene.title_anchor
+            text="Exit ✖", bind=self.exit_program, pos=self.scene.title_anchor
         )
+        # Set court texture
+        self.court.court.texture = COURT_TEXTURES[court]
 
     def run_point(self, traj) -> None:
         """
@@ -349,14 +436,14 @@ class TennisCourt:
     Animate the court and the ball.
     """
 
-    def __init__(self, scene, p1: str, p2: str, court_type="hard") -> None:
+    def __init__(self, scene, p1: str, p2: str, court_type="grass") -> None:
         """
         Take the scene from GUI and draw the tennis objects.
         """
         # Dimensions in meters (scaled to include surroundings)
         self.image = SimpleNamespace(
-            x=25.9781, z=16.5201
-        )  # TODO: Dictionary based on court_type
+            x=40.6, z=19.2  # x=25.9781, z=16.5201 or x=40.6, z=19.2
+        )
         self.court_xz, self.single_court, self.serve_box, _ = coordinates()
         self.stand_z = 6.15
 
@@ -372,14 +459,15 @@ class TennisCourt:
         self.scene = scene
         self.scene.select()
 
-        # Lighting
-        distant_light(direction=vector(0, 1, 0), color=color.white * 0.1)
-
         # Court
         self.court = box(
             pos=vector(0, 0, 0),
             size=vector(self.image.x, 0.25, self.image.z),
-            texture=COURT_TEXTURES[self.court_type],
+            texture={
+                "file": COURT_TEXTURES[self.court_type],
+                # "bumpmap": bumpmaps.gravel,
+            },
+            shininess=0.1,
         )
 
         # Net and supports
@@ -412,18 +500,20 @@ class TennisCourt:
 
         # Ball
         self.ball = sphere(
+            texture={"file": "assets/ball.jpg"},
             pos=vector(0, 0, 0),
-            radius=0.06,
-            color=color.yellow,
+            radius=0.08,
+            color=color.white,
             make_trail=False,
             trail_radius=0.03,
+            trail_color=color.yellow,
             retain=3,
             visible=False,
         )
 
         # Player labels
         self.labelp1 = label(
-            pos=vector(self.image.x / 2 - 2, 8, 0),
+            pos=vector(self.single_court.x + 1, 8, 0),
             text=p1,
             font="monospace",
             opacity=1,
@@ -431,7 +521,7 @@ class TennisCourt:
             height=20,
         )
         self.labelp2 = label(
-            pos=vector(-self.image.x / 2 + 2, 8, 0),
+            pos=vector(-self.single_court.x - 1, 8, 0),
             text=p2,
             font="monospace",
             opacity=1,
@@ -489,7 +579,7 @@ class TennisCourt:
                         self.info.visible = False
                     # Update ball position
                     self.ball.pos = vector(float(p[0]), float(p[1]), float(p[2]))
+                    self.ball.rotate(axis=vector(0, 0, 1), angle=0.5)
                     i += 1
-                    # self.ball.rotate(axis=vector(0,0,1), angle=0.5)
         self.animating = False
         return True

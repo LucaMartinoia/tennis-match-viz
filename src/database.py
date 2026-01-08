@@ -6,11 +6,29 @@ import re
 This module reads the CSV file as pandas dataframe, look for the rows
 associated with the match of interest, and convert the data in a format that
 can be passed to Match.
-
-TO DO:
-- Compute correct Gm missing values
-- Check court surface depending on tournament
 """
+
+TOURNAMENT_SURFACES = {
+    # Grand Slams
+    "australian_open": "hard",
+    "french_open": "clay",
+    "roland_garros": "clay",
+    "wimbledon": "grass",
+    "us_open": "hard",
+    # ATP/WTA Masters 1000
+    "indian_wells_masters": "hard",
+    "miami_masters": "hard",
+    "monte_carlo_masters": "clay",
+    "madrid_masters": "clay",
+    "rome_masters": "clay",
+    "canada_masters": "hard",
+    "cincinnati_masters": "hard",
+    "shanghai_masters": "hard",
+    "paris_masters": "hard",
+    # ATP Finals
+    "atp_finals": "hard",
+    "atp_cup": "hard",
+}
 
 
 class Database:
@@ -18,7 +36,7 @@ class Database:
     Load the database and extract match data.
     """
 
-    def __init__(self, bus, fname: str = "charting-m-points-2020s.csv") -> None:
+    def __init__(self, bus, fname) -> None:
         """
         Load, clean and prepare the dataframe.
         """
@@ -29,7 +47,11 @@ class Database:
         self.bus.subscribe("match-selected", self.set_match)
         # Load dataframe
         self.bus.emit("console-print", text="Loading database...")
-        self.df, result_str = self._load_csv(fname)
+        if fname:
+            self.fname = fname
+        else:
+            self.fname = "charting-m-points-2020s.csv"
+        self.df, result_str = self._load_csv(self.fname)
         # Sanitizing missing entries
         self._sanitize_df()
         # Expand the database with useful fields
@@ -105,6 +127,19 @@ class Database:
         """
         # Find list of unique tournaments
         t_list = self.df["tournament_full"].astype(str).unique().tolist()
+
+        # Sorting by year and alphabetically
+        def sort_key(t: str):
+            # split off the year (assume last token is year)
+            parts = t.rsplit(" ", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                name, year = parts[0], int(parts[1])
+            else:
+                name, year = t, 0  # fallback if no year
+            return (-year, name.lower())  # negative year for descending sort
+
+        t_list.sort(key=sort_key)
+
         # Emit signal with tournament list
         self.bus.emit("tournament-list-ready", t_list=t_list)
 
@@ -113,25 +148,28 @@ class Database:
         Set tournament field.
         """
         if tournament not in self.df["tournament_full"].values:
-            raise ValueError(f"Tournament '{tournament}' not found in dataset.")
-        self.tournament = tournament
+            print(f"Tournament '{tournament}' not found in dataset.")
+        else:
+            self.tournament = tournament
+            self.court = self.court_surface(tournament)
 
     def set_match(self, match_name: str) -> None:
         """
         Set tournament field.
         """
         if match_name not in self.df["match"].values:
-            raise ValueError(f"Match '{match_name}' not found in dataset.")
-        self.match = match_name
-        # When match is selected, emit dataframe and metadata (order matters!)
-        self.bus.emit("match-metadata-ready", metadata=self.get_match_metadata())
-        self.bus.emit("match-df-ready", match_df=self.get_match_dataframe())
+            print(f"Match '{match_name}' not found in dataset.")
+        else:
+            self.match = match_name
+            # When match is selected, emit dataframe and metadata (order matters!)
+            self.bus.emit("match-metadata-ready", metadata=self.get_match_metadata())
+            self.bus.emit("match-df-ready", match_df=self.get_match_dataframe())
 
     def matches_list(self, tournament: str = ""):
         """
         Return the full list of matches for a given tournament.
 
-        str: "match - p1_name vs p2_name"
+        str: "round - p1_name vs p2_name"
         """
         if tournament:
             self.set_tournament(tournament)
@@ -149,7 +187,7 @@ class Database:
         p2 = row["p2"]
         match_name = row["match"]
         n_points = len(df_match)
-        return p1, p2, match_name, self.tournament, n_points
+        return p1, p2, match_name, self.tournament, n_points, self.court
 
     def get_match_dataframe(self, match: str = ""):
         """
@@ -177,7 +215,7 @@ class Database:
 
         return df_t
 
-    def _format_point(self, point):
+    def _format_point(self, point: str):
         """
         Reads the point rallys and convert them in lists
         of strings that can be used by the dynamics.
@@ -188,7 +226,7 @@ class Database:
             return [""]
 
         # Split using your regex
-        parts = re.findall(r"[A-Za-z][^A-Za-z]*|^[0-9]+", point)
+        parts = re.findall(r"[A-Za-z][^A-Za-z]*|^[0-9]+[#@*]?", point)
 
         # Annotate transitions with optional "-" or "="
         for i in range(len(parts) - 1):
@@ -243,8 +281,13 @@ class Database:
         )
         self.df["match"] = parts[3] + " - " + self.df["p1"] + " vs " + self.df["p2"]
 
-    def court_type(self):
-        """
-        This method should scrape Wikipedia to find the court type for the given tournament.
-        """
-        pass
+    def court_surface(self, tournament_key: str) -> str:
+        # normalize: lowercase, remove year, replace spaces
+        key = tournament_key.strip().lower()
+        key = re.sub(r"\b\d{4}\b", "", key)  # remove year
+        key = re.sub(r"\s+", "_", key).strip(
+            "_"
+        )  # replace spaces with _, remove leading/trailing _
+
+        # lookup with fallback
+        return TOURNAMENT_SURFACES.get(key, "hard")

@@ -8,11 +8,16 @@ This module bridges Match and Engine: it takes the point data
 and converts it to geometric quantities that can be passed to Engine.
 
 TO DO:
-- Adjust time/position parameters
-- Implement higher diversity in shots (spin, fore/back-hand)
+- Implement higher diversity in shots (spin, fore-/back-hand)
 """
 
-np.random.seed(1)
+
+def net_f(z: float) -> float:
+    """
+    Function for the net chord.
+    """
+    return 0.004098 * z**2 + net.center
+
 
 #######################
 # Constants
@@ -100,16 +105,12 @@ class Parser:
         # First serve attempt
         if point_data.first[0]:
             self.engine.pause(1.0)
-            result = self._run_rally(
-                point_data.first, point_in_game, righthanded, server
-            )
+            result = self._run_rally(point_data.first, point_in_game)
 
             # Check if first serve was a fault
             if point_data.second[0]:
                 self.engine.pause(1.0)
-                result = self._run_rally(
-                    point_data.second, point_in_game, righthanded, server
-                )
+                result = self._run_rally(point_data.second, point_in_game)
         else:
             # If both serves are missing
             return False
@@ -119,11 +120,9 @@ class Parser:
         # Return result
         return result
 
-    def _run_rally(self, rally, point_in_game: int, righthanded, server: int) -> bool:
+    def _run_rally(self, rally, point_in_game: int) -> bool:
         """
         Parse the rally list to compute the trajectory.
-
-        IMPORTANT: righthanded and server might not be necessary after all.
         """
         # Check for non-mapped or penalty points
         if rally in ("S", "R", "P", "Q"):
@@ -183,7 +182,7 @@ class Parser:
 
         self.engine.bounces(v_f, n)
 
-    def _shot(self, shot_str: str, shot_index: int, righthanded: bool = True) -> bool:
+    def _shot(self, shot_str: str, shot_index: int) -> bool:
         """
         Parse the shot string and compute the trajectory.
         """
@@ -238,11 +237,6 @@ class Parser:
         if shot_data.y == YGROUND or shot_data.net:
             self.engine.bounces(v_f, n)
 
-        # Apply symmetries to lefties
-        # THIS MUST BE APPLIED TO SHOT DATA, NOT TO FINAL TRAJECTORY
-        # if righthanded:
-        #    self.engine.apply_symmetry(lambdaz=-1)
-
         return True
 
     def _compute_landing_data(
@@ -265,17 +259,17 @@ class Parser:
         match shot_type:
             # TO DO: differentiate between shots
             case "f" | "b" | "r" | "s" | "t" | "q":
-                T = np.random.uniform(1.05, 1.45)  # Baseline shots
+                T = np.random.uniform(0.95, 1.25)  # Baseline shots
             case "v" | "z" | "h" | "i" | "j" | "k":
-                T = np.random.uniform(0.5, 0.65)  # Voleè
+                T = np.random.uniform(0.6, 0.75)  # Voleè
             case "o" | "p":
-                T = np.random.uniform(0.2, 0.35)  # Smash
+                T = np.random.uniform(0.45, 0.55)  # Smash
             case "u" | "y":
-                T = np.random.uniform(0.6, 0.85)  # Drop shot TO DO: ADJUST DEPTH
+                T = np.random.uniform(1.1, 1.65)  # Drop shot
             case "l" | "m":
-                T = np.random.uniform(1, 1.5)  # Lob
+                T = np.random.uniform(1.5, 2.5)  # Lob
             case _:
-                T = np.random.uniform(1.05, 1.45)  # Unknown
+                T = np.random.uniform(0.95, 1.45)  # Unknown
 
         # Adjust landing depending on response shot
         # If response position is indicated
@@ -307,7 +301,7 @@ class Parser:
                     x_bounds = SINGLE_BBOX.get(depth)
 
                 case "o" | "p":  # Smash
-                    yf = np.random.uniform(2.5, 3.2)  # Hit mid air
+                    yf = np.random.uniform(2.5, 3.5)  # Hit mid air
                     # If depth missing
                     depth = depth if depth else "8"  # From mid court
                     width = width[0] + "s"
@@ -371,7 +365,7 @@ class Parser:
             case "n" | "g":  # Net or foot fault
                 # Recompute all values
                 intent.x = 0.2
-                intent.T = np.random.uniform(0.3, 0.45)
+                intent.T = np.random.uniform(0.4, 0.55)
                 intent.y = np.random.uniform(0.5, 0.91)
                 intent.net = True
 
