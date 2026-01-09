@@ -1,12 +1,12 @@
 # Tennis Point Visualizer
 
-<div style="width: 100%;">
-    <img src="assets/doc.png" style="float:right; width:420px; margin-left:10px; margin-bottom:10px;">
-</div>
-
 Tennis Point Visualizer is a lightweight and interactive application that lets you experience professional tennis matches point by point. It leverages shot-by-shot data from the [Match Charting Project](https://www.tennisabstract.com/blog/2015/09/23/the-match-charting-project-quick-start-guide/), a remarkable initiative that systematically records pro tennis matches in a standardized format, making it possible to analyze patterns and strategies.
 
 The app reads CSV files from the Match Charting Project and brings the match to life using [VPython](https://www.glowscript.org/docs/VPythonDocs/index.html), a simple yet powerful 3D animation library. While the data is not precise enough for exact meter-by-meter reconstruction of every shot, the main goal is to provide a clear and engaging visual impression of the flow, positioning, and dynamics of each point.
+
+<p align="center">
+    <img src="assets/doc.png">
+</p>
 
 Within the application, you can:
 
