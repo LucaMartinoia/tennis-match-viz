@@ -2,10 +2,10 @@
 
 Tennis Point Visualizer is a lightweight and interactive application that lets you experience professional tennis matches point by point. It leverages shot-by-shot data from the [Match Charting Project](https://www.tennisabstract.com/blog/2015/09/23/the-match-charting-project-quick-start-guide/), a remarkable initiative that systematically records pro tennis matches in a standardized format, making it possible to analyze patterns and strategies.
 
-The app reads CSV files from the Match Charting Project and brings the match to life using [VPython](https://www.glowscript.org/docs/VPythonDocs/index.html), a simple yet powerful 3D animation library. While the data is not precise enough for exact meter-by-meter reconstruction of every shot, the main goal is to provide a clear and engaging visual impression of the flow, positioning, and dynamics of each point.
+The app reads CSV files from the Match Charting Project and brings the match to life using [VPython](https://www.glowscript.org/docs/VPythonDocs/index.html), a simple 3D animation library. While the data is not precise enough for exact meter-by-meter reconstruction of every shot, the main goal is to provide a clear and engaging visual impression of the flow, positioning, and dynamics of each point.
 
 <p align="center">
-    <img src="assets/doc.png">
+    <img src="assets/doc.png" style="width: 60%;">
 </p>
 
 Within the application, you can:
@@ -19,7 +19,7 @@ Within the application, you can:
 
 I am not a professional software developer, and this project started purely as a personal side hobby. It grew out of curiosity and a desire to explore Python, GUI development, and 3D animations in a hands-on, playful way. The goal has always been to learn by doing, experiment with visualizations, and create something fun and interactive.
 
-## Installation
+## Installation and usage
 
 1.  Install dependencies from `requirements.txt` (need Python 3)
 
@@ -29,7 +29,11 @@ I am not a professional software developer, and this project started purely as a
 
         python app.py
 
-alternatively, you can use the `app.exe` file provided.
+3.  The CSV file with the match list can be found in `/data`. There you can add more CSV file from the Match Charting Project database.
+
+4.  To select a given file, edit the `config.txt` file accordingly.
+
+5.  You can also select a default tournament to look at, but for some reason this feature does not work all the time.
 
 ## Notes
 

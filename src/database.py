@@ -210,8 +210,8 @@ class Database:
         # Parse point strings
         df_t["1st"] = df_t["1st"].apply(self._format_point)
         df_t["2nd"] = df_t["2nd"].apply(self._format_point)
-        # Use Pt as index
-        df_t = df_t.set_index("Pt")
+        # Use Pt as index and sort by point number
+        df_t = df_t.set_index("Pt").sort_index()
 
         return df_t
 

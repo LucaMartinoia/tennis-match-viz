@@ -68,7 +68,7 @@ SINGLE_BBOX = {
     "7": [-serve_box.x, -2],  # Inside serve box
     "8": [-(serve_box.x + single_court.x) / 2, -serve_box.x],  # Close to serve box
     "9": [-single_court.x, -(serve_box.x + single_court.x) / 2],  # Close to baseline
-    "0x": [-single_court.x, -2],  # Unknown depth
+    "0x": [-single_court.x, -1.5],  # Unknown depth
 }
 
 
@@ -372,24 +372,24 @@ class Parser:
             case "w":  # Wide shot
                 # Adjust position depending on theoretical position
                 if intent.z < court_zmid:
-                    zspan = intent.z - zmin
+                    zspan = intent.z - zmin + 0.1
                     intent.z -= np.random.uniform(zspan, zspan + 1)
                 else:
-                    zspan = zmax - intent.z
+                    zspan = zmax - intent.z + 0.1
                     intent.z += np.random.uniform(zspan, zspan + 1)
 
             case "d":  # deep shot
                 # Adjust position depending on theoretical position
-                xspan = intent.x - xmin
+                xspan = intent.x - xmin + 0.1
                 intent.x -= np.random.uniform(xspan, xspan + 2)
 
             case "x" | "e":  # deep and wide or unknown error
                 # Adjust position depending on theoretical position
-                xspan = intent.x - xmin
+                xspan = intent.x - xmin + 0.1
                 intent.x -= np.random.uniform(xspan, xspan + 2)
                 if intent.z < court_zmid:
-                    zspan = intent.z - zmin
+                    zspan = intent.z - zmin + 0.1
                     intent.z -= np.random.uniform(zspan, zspan + 1)
                 else:
-                    zspan = zmax - intent.z
+                    zspan = zmax - intent.z + 0.1
                     intent.z += np.random.uniform(zspan, zspan + 1)

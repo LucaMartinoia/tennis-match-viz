@@ -167,8 +167,14 @@ class Match:
         pts_str = str(row.get("Pts", "0-0"))
         server = row.get("Svr", 0)
         try:
-            pts1_str, pts2_str = pts_str.split("-")
-            pts1, pts2 = pts1_str, pts2_str
+            pts_srv, pts_def = pts_str.split("-")
+            if server == 1:
+                pts1, pts2 = pts_srv, pts_def
+            elif server == 2:
+                pts1, pts2 = pts_def, pts_srv
+            else:
+                # Unknown server
+                pts1, pts2 = pts_srv, pts_def
         except ValueError:
             self.bus.emit("console-print", text=f"Score data is missing: {pts_str}")
             pts1, pts2 = 0, 0

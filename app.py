@@ -1,6 +1,7 @@
 from src.database import Database
 from src.match import Match
 from src.gui_vpython import GUI
+import os
 
 
 def read_config():
@@ -9,6 +10,10 @@ def read_config():
     """
     fname = None
     t_name = None
+
+    if not os.path.isfile("config.txt"):
+        print("WARNING: config.txt file is missing.")
+        return fname, t_name
 
     with open("config.txt", "r") as f:
         for line in f:
