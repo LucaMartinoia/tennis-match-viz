@@ -1,3 +1,5 @@
 numpy
 pandas
 vpython
+requests
+setuptools<82

@@ -15,7 +15,7 @@ from vpython import (
     bumpmaps,
 )
 from types import SimpleNamespace
-from src.engine import coordinates
+from tennis_viz.engine import coordinates
 from datetime import datetime
 import numpy as np
 import os
@@ -107,8 +107,7 @@ class GUI:
         self.court = TennisCourt(self.scene, self.p1, self.p2)
 
         # Empty score table
-        self.score = wtext(
-            text=f"""
+        self.score = wtext(text=f"""
             <div style='width: {self.scene_width}px; text-align: center; margin-top: -50; margin-bottom: -35; padding: 0;'>
                 <table style='border-collapse: collapse; margin: 0 auto; font-size:16px; table-layout: fixed;'>
                     <tr>
@@ -135,8 +134,7 @@ class GUI:
                 </table>
                 <hr style='border:1px solid white; width:80%; margin: -15px auto 0 auto;'/>
             </div>
-            """
-        )
+            """)
 
         #######################
         # Menu and buttons
@@ -183,13 +181,11 @@ class GUI:
         self.button_last = button(bind=self.change_point, text=" ⏭ ")
 
         # Initialize console
-        wtext(
-            text=f"""
+        wtext(text=f"""
             <div style='width: {self.scene_width}px; text-align: left; padding: 0; margin: 0;'>
                 <hr style='border:1px solid white; width:80%; margin: -15px auto -45px auto;'/>
             </div>
-            """
-        )
+            """)
         wtext(text=f"\n\t<b>CONSOLE</b>\n\n")
         self.console = wtext(text="\n\n\t")
         self.GUI_print("Welcome to TennisPointVisualizer!")
@@ -201,7 +197,7 @@ class GUI:
         """
         # Check if called from button press or key press
         is_key_exit = hasattr(evt, "key") and evt.key in ("esc", "escape", "end")
-        is_button_exit = hasattr(evt, "text") and evt.text == "Exit"
+        is_button_exit = hasattr(evt, "text") and "exit" in evt.text.lower()
 
         if is_key_exit or is_button_exit:
             # Delete scene and close thread

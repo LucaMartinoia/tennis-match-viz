@@ -1,5 +1,5 @@
 import numpy as np
-from src.engine import coordinates
+from tennis_viz.engine import coordinates
 from dataclasses import dataclass
 import re
 

@@ -67,14 +67,31 @@ class Database:
         """
         Load the database from the CSV file.
         """
+        import requests
+        from io import StringIO
+
         # Directories containing this file and root
         here = Path(__file__).resolve().parent
         root = here.parent
         fpath = root / "data" / fname
+
         # Loading data
         try:
+            if fpath.exists():
+                # Load local file
+                source = fpath
+            else:
+                # Load remote file
+                url = (
+                    "https://raw.githubusercontent.com/"
+                    f"JeffSackmann/tennis_MatchChartingProject/master/{fname}"
+                )
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                source = StringIO(response.text)
+
             df = pd.read_csv(
-                fpath,
+                source,
                 dtype={
                     "match_id": "string",
                     "Pt": "int64",
@@ -91,9 +108,13 @@ class Database:
                 },
                 keep_default_na=True,
             )
-        # Handling exceptions
-        except FileNotFoundError:
-            raise FileNotFoundError(f"CSV file not found at {fpath}")
+
+        except requests.exceptions.HTTPError as e:
+            raise FileNotFoundError(
+                f"CSV file not found locally ({fpath}) or remotely ({url}): {e}"
+            )
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Error downloading remote CSV file: {e}")
         except pd.errors.DtypeWarning as e:
             print(f"Warning while loading CSV: {e}")
         except Exception as e:

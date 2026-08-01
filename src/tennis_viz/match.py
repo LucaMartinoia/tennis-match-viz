@@ -1,5 +1,5 @@
-from src.engine import Engine
-from src.parser import Parser
+from tennis_viz.engine import Engine
+from tennis_viz.parser import Parser
 import pandas as pd
 from dataclasses import dataclass
 
