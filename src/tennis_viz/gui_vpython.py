@@ -74,10 +74,7 @@ class GUI:
         self.point = 0
         self.second = False
         self.ace = 0
-        self.set1 = 0
-        self.set2 = 0
-        self.game1 = 0
-        self.game2 = 0
+        self.set_scores = [(0, 0)]
         self.point1 = 0
         self.point2 = 0
 
@@ -113,22 +110,19 @@ class GUI:
                     <tr>
                         <td style='width:24px;'></td>
                         <td style='border:none;padding:6px;'></td>
-                        <td style='border:1px solid white;padding:6px;'>Set</td>
-                        <td style='border:1px solid white;padding:6px;'>Game</td>
+                        <td style='border:1px solid white;padding:6px;'>Set 1</td>
                         <td style='border:1px solid white;padding:6px;'>Point</td>
                     </tr>
                     <tr>
                         <td style='width:24px;text-align:center;border:none;'> </td>
                         <td style='border:1px solid white;padding:6px;'>{self.p1}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.set1}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.game1}</td>
+                        <td style='border:1px solid white;padding:6px;'>0</td>
                         <td style='border:1px solid white;padding:6px;'>{self.point1}</td>
                     </tr>
                     <tr>
                         <td style='width:24px;text-align:center;border:none;'> </td>
                         <td style='border:1px solid white;padding:6px;'>{self.p2}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.set2}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.game2}</td>
+                        <td style='border:1px solid white;padding:6px;'>0</td>
                         <td style='border:1px solid white;padding:6px;'>{self.point2}</td>
                     </tr>
                 </table>
@@ -288,43 +282,44 @@ class GUI:
 
         Update the score table.
         """
-        (
-            self.set1,
-            self.set2,
-            self.game1,
-            self.game2,
-            self.point1,
-            self.point2,
-            self.server,
-        ) = score
+        self.set_scores, self.point1, self.point2, self.server = score
         dot = ["", ""]
         if self.server == 1:
             dot[0] = "●"
         elif self.server == 2:
             dot[1] = "●"
 
+        set_headers = "".join(
+            f"<td style='border:1px solid white;padding:6px;'>Set {i}</td>"
+            for i in range(1, len(self.set_scores) + 1)
+        )
+        player1_sets = "".join(
+            f"<td style='border:1px solid white;padding:6px;'>{score1}</td>"
+            for score1, _ in self.set_scores
+        )
+        player2_sets = "".join(
+            f"<td style='border:1px solid white;padding:6px;'>{score2}</td>"
+            for _, score2 in self.set_scores
+        )
         self.score.text = f"""
             <div style='width: {self.scene_width}px; text-align: center; margin-top: -50; margin-bottom:-35; padding: 0;'>
                 <table style='border-collapse: collapse; margin: 0 auto; font-size:16px; table-layout: fixed;'>
                     <tr>
                         <td style='width:24px;'></td>
                         <td style='border:none;padding:6px;'></td>
-                        <td style='border:1px solid white;padding:6px;'>Set</td>
-                        <td style='border:1px solid white;padding:6px;'>Game</td>
+                        {set_headers}
                         <td style='border:1px solid white;padding:6px;'>Point</td>
                     </tr>
                     <tr>
                         <td style='width:24px;text-align:center;border:none;'>{dot[0]}</td>
                         <td style='border:1px solid white;padding:6px;'>{self.p1}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.set1}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.game1}</td>
+                        {player1_sets}
                         <td style='border:1px solid white;padding:6px;'>{self.point1}</td>
                     </tr>
                     <tr>
                         <td style='width:24px;text-align:center;border:none;'>{dot[1]}</td>
                         <td style='border:1px solid white;padding:6px;'>{self.p2}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.set2}</td>
-                        <td style='border:1px solid white;padding:6px;'>{self.game2}</td>
+                        {player2_sets}
                         <td style='border:1px solid white;padding:6px;'>{self.point2}</td>
                     </tr>
                 </table>

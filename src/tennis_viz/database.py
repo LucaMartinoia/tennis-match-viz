@@ -72,8 +72,20 @@ class Database:
 
         # Directories containing this file and root
         here = Path(__file__).resolve().parent
-        root = here.parent
-        fpath = root / "data" / fname
+        # Find data directory: try multiple paths for dev and CLI modes
+        possible_roots = [
+            here.parent.parent,  # Development: src/tennis_viz/database.py -> root
+            here.parent,         # Alternative or CLI install structure
+        ]
+        fpath = None
+        for root_candidate in possible_roots:
+            candidate = root_candidate / "data" / fname
+            if candidate.exists():
+                fpath = candidate
+                break
+        # If not found, use first path for error message
+        if fpath is None:
+            fpath = possible_roots[0] / "data" / fname
 
         # Loading data
         try:
@@ -224,9 +236,9 @@ class Database:
         if len(df_t["match_id"].unique()) != 1:
             return print("Tournament and match returned multiple matches.")
 
-        # Filter the data we need
+        # Filter the data we need (include TbSet for tie-break detection)
         df_t = df_t[
-            ["Pt", "Set1", "Set2", "Gm1", "Gm2", "Pts", "Svr", "1st", "2nd", "PtWinner"]
+            ["Pt", "Set1", "Set2", "Gm1", "Gm2", "Pts", "Gm#", "TbSet", "Svr", "1st", "2nd", "PtWinner"]
         ]
         # Parse point strings
         df_t["1st"] = df_t["1st"].apply(self._format_point)
