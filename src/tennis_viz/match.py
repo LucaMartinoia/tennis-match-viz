@@ -211,19 +211,13 @@ class Match:
                 # Last row of the previous set is in previous_row
                 gm1 = int(previous_row.get("Gm1", 0))
                 gm2 = int(previous_row.get("Gm2", 0))
-                # Detect tie-break: both games 6-6 and TbSet flagged
-                try:
-                    tbflag = bool(previous_row.get("TbSet", False))
-                except Exception:
-                    tbflag = False
-                if gm1 == 6 and gm2 == 6 and tbflag:
-                    # Determine which player won the set by comparing set totals
-                    if current_set[0] > previous_set[0]:
-                        set_scores.append((7, 6))
-                    else:
-                        set_scores.append((6, 7))
-                else:
-                    set_scores.append((gm1, gm2))
+                # Determine which player won the set by comparing set totals
+                if current_set[0] > previous_set[0]:
+                    gm1 += 1
+                elif current_set[1] > previous_set[1]:
+                    gm2 += 1
+                # If TbSet flagged and both were 6, this results in 7-6/6-7 correctly
+                set_scores.append((gm1, gm2))
             previous_set = current_set
             previous_row = historical_row
 
