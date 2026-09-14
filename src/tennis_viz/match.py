@@ -139,6 +139,27 @@ class Match:
         """
         Callback function to when the GUI completes the animation.
         """
+        # If this was the last point in the match, update the display to
+        # show the final match score (attribute the last point to the winner)
+        try:
+            if self.match_df is not None and not self.match_df.empty:
+                last_index = self.match_df.index[-1]
+                if self.point == last_index:
+                    set_scores, pts1, pts2, server = self.get_score_data()
+                    # Apply the last point to the winner (PtWinner column)
+                    row = self.match_df.loc[self.point]
+                    pt_winner = int(row.get("PtWinner", 0) or 0)
+                    if pt_winner in (1, 2) and set_scores:
+                        final = [list(s) for s in set_scores]
+                        idx = 0 if pt_winner == 1 else 1
+                        final[-1][idx] += 1
+                        final_tuples = [tuple(x) for x in final]
+                        # After the game point, points reset to 0-0
+                        self.bus.emit("update-score", score=(final_tuples, "0", "0", server))
+        except Exception:
+            # Be permissive: don't block animation flow on score update errors
+            pass
+
         # If animation is complete, move to next point automatically
         if self.autoplay:
             self.bus.emit("change-point", point="next")
@@ -154,16 +175,11 @@ class Match:
         """
         Get current point score for the GUI.
         """
-        # If data is missing, return 0 in all score fields
+        # If data is missing, return an empty set score and point score.
         if self.match_df is None or self.match_df.empty:
-            return 0, 0, 0, 0, 0, 0
+            return [], "0", "0", 0
 
         row = self.match_df.loc[self.point]
-        # Gather score. If data is missing, fallback to 0
-        set1 = row.get("Set1", 0)
-        set2 = row.get("Set2", 0)
-        gm1 = row.get("Gm1", 0)
-        gm2 = row.get("Gm2", 0)
         pts_str = str(row.get("Pts", "0-0"))
         server = row.get("Svr", 0)
         try:
@@ -178,7 +194,36 @@ class Match:
         except ValueError:
             self.bus.emit("console-print", text=f"Score data is missing: {pts_str}")
             pts1, pts2 = 0, 0
-        return set1, set2, gm1, gm2, pts1, pts2, server
+
+        # Set1/Set2 are set totals, while Gm1/Gm2 are the game totals in
+        # the current set. Reconstruct completed set scores from the rows
+        # leading up to the current point. Detect tie-breaks and report
+        # final set scores as 7-6 / 6-7 when appropriate.
+        set_scores = []
+        previous_set = (0, 0)
+        previous_row = None
+        for _, historical_row in self.match_df.loc[: self.point].iterrows():
+            current_set = (
+                int(historical_row.get("Set1", 0)),
+                int(historical_row.get("Set2", 0)),
+            )
+            if previous_row is not None and current_set != previous_set:
+                # Last row of the previous set is in previous_row
+                gm1 = int(previous_row.get("Gm1", 0))
+                gm2 = int(previous_row.get("Gm2", 0))
+                # Determine which player won the set by comparing set totals
+                if current_set[0] > previous_set[0]:
+                    gm1 += 1
+                elif current_set[1] > previous_set[1]:
+                    gm2 += 1
+                # If TbSet flagged and both were 6, this results in 7-6/6-7 correctly
+                set_scores.append((gm1, gm2))
+            previous_set = current_set
+            previous_row = historical_row
+
+        # Current (live) set game counts
+        set_scores.append((int(row.get("Gm1", 0)), int(row.get("Gm2", 0))))
+        return set_scores, pts1, pts2, server
 
     def get_point_data(self):
         """
