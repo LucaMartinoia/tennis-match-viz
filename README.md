@@ -5,7 +5,7 @@ Tennis Match Visualizer is a lightweight and interactive application that lets y
 The app reads CSV files from the Match Charting Project and brings the match to life using [VPython](https://www.glowscript.org/docs/VPythonDocs/index.html), a simple 3D animation library. While the data is not precise enough for exact meter-by-meter reconstruction of every shot, the main goal is to provide a clear and engaging visual impression of the flow, positioning, and dynamics of each point.
 
 <p align="center">
-    <img src="assets/doc.png" style="width: 60%;">
+    <img src="assets/tennis.jpg" style="width: 60%;">
 </p>
 
 Within the application, you can:
