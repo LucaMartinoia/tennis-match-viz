@@ -3,3 +3,4 @@ pandas
 vpython
 requests
 setuptools<82
+pytest

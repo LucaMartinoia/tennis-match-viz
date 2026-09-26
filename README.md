@@ -17,23 +17,39 @@ Within the application, you can:
 - Interact with the camera: zoom, rotate, and move freely
 - View a live score table and follow the match progression
 
-I am not a professional software developer, and this project started purely as a personal side hobby. It grew out of curiosity and a desire to explore Python, GUI development, and 3D animations in a hands-on, playful way. The goal has always been to learn by doing, experiment with visualizations, and create something fun and interactive.
+This project started as a hands-on exploration of Python, GUI development, and 3D animation. It continues to be a space for experimenting with visualizations and creating an engaging way to explore tennis match data.
 
 ## Installation and usage
 
-1.  Install dependencies from `requirements.txt` (need Python 3)
+1.  Install the package and its runtime dependencies (Python 3):
+
+        pip install -e .
+
+2.  Run the application from the command line:
+
+        tennis-viz --config
+
+    You can also start it directly from the repository:
+
+        python app.py --config
+
+3.  The CSV file with the match list can be found in `/data`. You can add more CSV files from the Match Charting Project database.
+
+4.  To select a given file or default tournament, edit `config.txt`.
+
+## Running tests
+
+Install the development and test dependencies:
 
         pip install -r requirements.txt
 
-2.  Run the program with
+Run the full test suite:
 
-        python app.py
+        python -m pytest
 
-3.  The CSV file with the match list can be found in `/data`. There you can add more CSV file from the Match Charting Project database.
+Run only the application startup tests:
 
-4.  To select a given file, edit the `config.txt` file accordingly.
-
-5.  You can also select a default tournament to look at, but for some reason this feature does not work all the time.
+        python -m pytest -q tests/test_launch.py
 
 ## Notes
 
